@@ -1,0 +1,112 @@
+############################
+# OS-specific
+############################
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux / editors
+*~
+*.swp
+*.swo
+
+############################
+# VS / .NET / C#
+############################
+# Build artifacts
+bin/
+obj/
+[Bb]uild/
+[Bb]uilds/
+artifacts/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Profilers / analyzers
+*.vsp
+*.vspx
+*.psess
+*.psessv2
+*.sap
+
+# Publish artifacts
+publish/
+**/wwwroot/
+
+# User / environment-specific .NET config
+appsettings.Development.json
+appsettings.Local.json
+# keep appsettings.json if you want default config in repo
+
+# Azure publish profiles (often contain secrets)
+**/Properties/PublishProfiles/
+*.pubxml
+*.publishsettings
+
+############################
+# Node / React / Vite
+############################
+# Node modules
+node_modules/
+
+# Frontend build output
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Tooling caches
+.eslintcache
+.stylelintcache
+.turbo/
+.parcel-cache/
+.cache/
+
+############################
+# Environment files (secrets)
+############################
+.env
+.env.*            # e.g. .env.local, .env.development
+!.env.example     # keep example env files
+
+############################
+# Local databases
+############################
+*.sqlite
+*.sqlite3
+*.db
+*.mdf
+*.ldf
+
+############################
+# Editor configuration
+############################
+# VS Code (only track if you really want shared workspace settings)
+.vscode/
