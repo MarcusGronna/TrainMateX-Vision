@@ -24,7 +24,7 @@ jobs:
           dotnet-version: '9.x'
 
       - name: Restore
-        working-directory: ./backend
+        working-directory: ./backend/TrainMateX.Api
         run: dotnet restore
 
       - name: Build with dotnet
