@@ -1,4 +1,7 @@
+using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+
+JwtSecurityTokenHandler.DefaultMapInboundClaims = false;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +22,12 @@ builder.Services
     {
         options.Authority = builder.Configuration["Clerk:Issuer"];
         options.Audience = builder.Configuration["Clerk:Audience"];
+
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            NameClaimType = "sub",
+            RoleClaimType = "org_role"
+        };
     });
 
 builder.Services.AddAuthorization();

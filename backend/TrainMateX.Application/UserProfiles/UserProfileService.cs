@@ -31,6 +31,7 @@ public class UserProfileService
             CreatedAt = DateTime.UtcNow
         };
 
-        return await _repository.AddAsync(profile, ct);
+        await _repository.AddAsync(profile, ct);
+        return profile;
     }
 }

@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+// [Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class MeController : ControllerBase
@@ -15,18 +16,14 @@ public class MeController : ControllerBase
 
     [HttpGet]
     [Authorize]
-    public async Task<ActionResult<object>> Get(CancellationToken ct)
+    public async Task<IActionResult> Get(CancellationToken ct)
     {
-        return Ok();
-        var clerkUserId = User.FindFirstValue("sub");
-        if (string.IsNullOrWhiteSpace(clerkUserId))
-        {
-            return Unauthorized("Missing Clerk user id");
-        }
+        var clerkUserId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Missing Clerk user id claim");
 
         // Test data
-        string name = "Test";
-        string email = "Test@Test";
+        string? name = User.FindFirst("full_name")?.Value;
+        string? email = User.FindFirstValue("email");
 
         var profile = await _userProfileService.GetOrCreateAsync(
             clerkUserId,
