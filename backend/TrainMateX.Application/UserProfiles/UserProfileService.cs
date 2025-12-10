@@ -1,4 +1,3 @@
-using System.Globalization;
 using TrainMateX.Domain.Entities;
 
 public class UserProfileService
