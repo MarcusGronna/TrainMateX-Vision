@@ -9,4 +9,6 @@ public class UserProfile
     public string? Email { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public ICollection<TrainingProgram> TrainingPrograms { get; set; } = new List<TrainingProgram>();
 }
