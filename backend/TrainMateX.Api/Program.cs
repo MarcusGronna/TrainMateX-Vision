@@ -1,3 +1,6 @@
+
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -10,6 +13,16 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddScoped<UserProfileService>();
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Clerk:Issuer"];
+        options.Audience = builder.Configuration["Clerk:Audience"];
+    });
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
