@@ -1,4 +1,6 @@
-class UserProfile
+namespace TrainMateX.Domain.Entities;
+
+public class UserProfile
 {
     public Guid Id { get; set; }
 
