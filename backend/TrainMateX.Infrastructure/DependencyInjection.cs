@@ -14,6 +14,7 @@ public static class DependencyInjection
         });
 
         // will add repository registrations here
+        services.AddScoped<IUserProfileRepository, UserProfileRepository>();
 
         return services;
     }
