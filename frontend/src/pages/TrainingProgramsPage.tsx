@@ -34,7 +34,7 @@ export function TrainingProgramsPage() {
         }
 
         const response = await fetch(
-          `${import.meta.env.Vite_API_BASE_URL}trainingprograms`,
+          `${import.meta.env.VITE_API_BASE_URL}trainingprograms`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
