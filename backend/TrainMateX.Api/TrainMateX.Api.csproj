@@ -16,4 +16,9 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\TrainMateX.Application\TrainMateX.Application.csproj" />
+    <ProjectReference Include="..\TrainMateX.Infrastructure\TrainMateX.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>
