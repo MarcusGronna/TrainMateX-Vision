@@ -111,3 +111,4 @@ pnpm-debug.log*
 ############################
 # VS Code (only track if you really want shared workspace settings)
 .vscode/
+frontend/.env.local
