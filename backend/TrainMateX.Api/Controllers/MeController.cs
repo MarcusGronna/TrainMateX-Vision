@@ -17,6 +17,7 @@ public class MeController : ControllerBase
     [Authorize]
     public async Task<ActionResult<object>> Get(CancellationToken ct)
     {
+        return Ok();
         var clerkUserId = User.FindFirstValue("sub");
         if (string.IsNullOrWhiteSpace(clerkUserId))
         {
