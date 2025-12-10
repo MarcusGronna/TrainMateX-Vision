@@ -94,8 +94,8 @@ pnpm-debug.log*
 ############################
 .env
 .env.*            # e.g. .env.local, .env.development
-!.env.example 
-.env.local    # keep example env files
+!.env.example
+.env.local     # keep example env files
 
 ############################
 # Local databases
@@ -105,11 +105,9 @@ pnpm-debug.log*
 *.db
 *.mdf
 *.ldf
-*.sql
 
 ############################
 # Editor configuration
 ############################
 # VS Code (only track if you really want shared workspace settings)
 .vscode/
-frontend/.env.local
