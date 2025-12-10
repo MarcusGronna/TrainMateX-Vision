@@ -96,6 +96,7 @@ pnpm-debug.log*
 .env.*            # e.g. .env.local, .env.development
 !.env.example 
 .env.local    # keep example env files
+*.txt
 
 ############################
 # Local databases
