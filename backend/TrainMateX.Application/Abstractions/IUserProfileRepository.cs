@@ -3,7 +3,7 @@ using TrainMateX.Domain.Entities;
 public interface IUserProfileRepository
 {
     Task<UserProfile?> GetByClerkUserIdAsync(
-        string clerUserId,
+        string clerkUserId,
         CancellationToken ct = default
     );
 

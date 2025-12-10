@@ -9,6 +9,8 @@ builder.Services.AddSwaggerGen();
 // Infrastructure (DbContext m.m.)
 builder.Services.AddInfrastructure(builder.Configuration);
 
+builder.Services.AddScoped<UserProfileService>();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
