@@ -1,4 +1,4 @@
-type TrainingProgram = {
+export type TrainingProgram = {
   id: string
   name: string
   description?: string | null
