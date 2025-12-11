@@ -1,3 +1,4 @@
+import type { TrainingProgram } from '@/types/TrainingProgram'
 import { useAuth } from '@clerk/clerk-react'
 import { useParams } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
