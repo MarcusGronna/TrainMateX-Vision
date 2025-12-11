@@ -1,13 +1,6 @@
 import { useAuth } from '@clerk/clerk-react'
+import { Link } from '@tanstack/react-router'
 import { useEffect, useState, type FormEvent } from 'react'
-
-type TrainingProgram = {
-  id: string
-  name: string
-  description?: string | null
-  level?: string | null
-  createdAt: string
-}
 
 export function TrainingProgramsPage() {
   const { getToken } = useAuth()
@@ -165,24 +158,27 @@ export function TrainingProgramsPage() {
       ) : (
         <ul className="space-y-3">
           {programs.map((p) => (
-            <li
-              key={p.id}
-              className="bg-white p-4 rounded-xl border shadow-sm hover:shadow-md transition"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-gray-900">{p.name}</h2>
-                {p.level && (
-                  <span className="text-sm text-gray-500">{p.level}</span>
+            <li key={p.id}>
+              <Link
+                to="/programs/$programId"
+                params={{ programId: p.id }}
+                className="block rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold text-gray-900">{p.name}</h2>
+                  {p.level && (
+                    <span className="text-sm text-gray-500">{p.level}</span>
+                  )}
+                </div>
+
+                {p.description && (
+                  <p className="text-sm text-gray-700 mt-1">{p.description}</p>
                 )}
-              </div>
 
-              {p.description && (
-                <p className="text-sm text-gray-700 mt-1">{p.description}</p>
-              )}
-
-              <p className="text-xs text-gray-400 mt-2">
-                Created: {new Date(p.createdAt).toLocaleDateString()}
-              </p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Created: {new Date(p.createdAt).toLocaleDateString()}
+                </p>
+              </Link>
             </li>
           ))}
         </ul>
