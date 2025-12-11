@@ -168,7 +168,6 @@ export function ProgramDetailPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-6 p-4">
-      {/* Program-header */}
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-gray-900">{program.name}</h1>
         {program.level && (
@@ -182,7 +181,6 @@ export function ProgramDetailPage() {
         </p>
       </div>
 
-      {/* Create Workout-formulär */}
       <form
         onSubmit={handleCreate}
         className="space-y-4 rounded-xl border bg-white p-4 shadow-sm"
@@ -231,7 +229,6 @@ export function ProgramDetailPage() {
         </button>
       </form>
 
-      {/* Lista av workouts */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-gray-900">
           Workouts in this program
