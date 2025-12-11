@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TrainMateX.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using TrainMateX.Infrastructure.Persistence;
 namespace TrainMateX.Infrastructure.Migrations
 {
     [DbContext(typeof(TrainMateXDbContext))]
-    partial class TrainMateXDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251211174442_AddWorkoutEntity2")]
+    partial class AddWorkoutEntity2
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

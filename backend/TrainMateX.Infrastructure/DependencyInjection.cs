@@ -16,6 +16,7 @@ public static class DependencyInjection
         // will add repository registrations here
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<ITrainingProgramRepository, TrainingProgramRepository>();
+        services.AddScoped<IWorkoutRepository, WorkoutRepository>();
 
         return services;
     }

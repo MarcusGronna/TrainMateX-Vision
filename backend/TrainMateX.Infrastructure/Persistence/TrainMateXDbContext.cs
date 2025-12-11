@@ -10,6 +10,8 @@ public class TrainMateXDbContext : DbContext
 
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<TrainingProgram> TrainingPrograms => Set<TrainingProgram>();
+    public DbSet<Workout> Workouts => Set<Workout>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -24,5 +26,27 @@ public class TrainMateXDbContext : DbContext
             .WithMany(u => u.TrainingPrograms)
             .HasForeignKey(tp => tp.UserProfileId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Workout>(entity =>
+        {
+            entity.ToTable("Workouts");
+
+            entity.HasKey(w => w.Id);
+
+            entity.Property(w => w.Name)
+                .IsRequired()
+                .HasMaxLength(200);
+
+            entity.Property(w => w.DayOfWeek)
+                .HasMaxLength(20);
+
+            entity.Property(w => w.CreatedAt)
+                 .HasDefaultValueSql("GETUTCDATE()");
+
+            entity.HasOne(w => w.TrainingProgram)
+                .WithMany(p => p.Workouts)
+                .HasForeignKey(w => w.TrainingProgramId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 }
