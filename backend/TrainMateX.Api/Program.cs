@@ -31,6 +31,11 @@ builder.Services
         };
     });
 
+builder.Services.AddCors(options =>
+{
+
+});
+
 builder.Services.AddAuthorization();
 
 var app = builder.Build();
