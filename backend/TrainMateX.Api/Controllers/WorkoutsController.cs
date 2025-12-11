@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -7,19 +8,32 @@ using Microsoft.AspNetCore.Mvc;
 public class WorkoutsController : ControllerBase
 {
     private readonly WorkoutService _workoutService;
+    private readonly UserProfileService _userProfileService;
 
-    public WorkoutsController(WorkoutService workoutService)
+    public WorkoutsController(
+        WorkoutService workoutService,
+        UserProfileService userProfileService)
     {
         _workoutService = workoutService;
+        _userProfileService = userProfileService;
     }
 
     [HttpGet]
     public async Task<ActionResult<IEnumerable<WorkoutResponse>>> GetForProgram(
         Guid trainingProgramId,
-        Guid userProfileId,
         CancellationToken ct)
     {
-        var workouts = await _workoutService.GetForProgramAsync(trainingProgramId, userProfileId, ct);
+        var clerkUserId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Missing Clerk user id claim");
+
+        var userProfile = await _userProfileService.GetOrCreateAsync(
+            clerkUserId,
+            name: User.FindFirst("full_name")?.Value,
+            email: User.FindFirstValue("email"),
+            ct
+        );
+
+        var workouts = await _workoutService.GetForProgramAsync(trainingProgramId, userProfile.Id, ct);
 
         var response = workouts.Select(w => new WorkoutResponse(
             w.Id,
@@ -35,10 +49,19 @@ public class WorkoutsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<WorkoutResponse>> Create(
         Guid trainingProgramId,
-        Guid userProfileId,
         [FromBody] CreateWorkoutRequest request,
         CancellationToken ct)
     {
+        var clerkUserId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Missing Clerk user id claim");
+
+        var userProfile = await _userProfileService.GetOrCreateAsync(
+            clerkUserId,
+            name: User.FindFirst("full_name")?.Value,
+            email: User.FindFirstValue("email"),
+            ct
+        );
+
         if (string.IsNullOrWhiteSpace(request.Name))
         {
             return BadRequest("Name is required");
@@ -46,7 +69,7 @@ public class WorkoutsController : ControllerBase
 
         var workout = await _workoutService.CreateForProgramAsync(
             trainingProgramId,
-            userProfileId,
+            userProfile.Id,
             request.Name.Trim(),
             request.DayOfWeek,
             request.Notes,
