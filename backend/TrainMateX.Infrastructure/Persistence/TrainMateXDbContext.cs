@@ -31,21 +31,23 @@ public class TrainMateXDbContext : DbContext
             .HasForeignKey(tp => tp.UserProfileId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<WorkoutExercise>()
-            .HasOne(we => we.Workout)
-            .WithMany(w => w.WorkoutExercises)
-            .HasForeignKey(we => we.WorkoutId)
-            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<WorkoutExercise>(we =>
+        {
+            we.HasKey(x => x.Id);
 
-        modelBuilder.Entity<WorkoutExercise>()
-            .HasOne(we => we.Exercise)
-            .WithMany(e => e.WorkoutExercises)
-            .HasForeignKey(we => we.ExerciseId)
-            .OnDelete(DeleteBehavior.Restrict);
+            we.HasOne(x => x.Workout)
+                .WithMany(w => w.WorkoutExercises)
+                .HasForeignKey(x => x.WorkoutId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<WorkoutExercise>()
-            .HasIndex(we => new { we.WorkoutId, we.ExerciseId })
-            .IsUnique();
+            we.HasOne(x => x.Exercise)
+                .WithMany(e => e.WorkoutExercises)
+                .HasForeignKey(x => x.ExerciseId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            we.Property(x => x.Sets).IsRequired();
+            we.Property(x => x.Reps).IsRequired();
+        });
 
         modelBuilder.Entity<Workout>(entity =>
         {
