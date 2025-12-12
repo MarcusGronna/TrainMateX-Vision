@@ -5,6 +5,8 @@ import type {
 } from '@/types/WorkoutExercise'
 import type { Workout } from '@/types/Workout'
 import { humanizeEnum } from '@/lib/humanizeEnum'
+import { ExerciseFilters } from '@/components/ExerciseFilters'
+import { DIFFICULTIES, EQUIPMENT, MUSCLE_GROUPS } from '@/lib/exerciseEnums'
 
 import { useAuth } from '@clerk/clerk-react'
 import { Link, useParams } from '@tanstack/react-router'
@@ -25,8 +27,20 @@ export function WorkoutDetailPage() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
 
-  // 1) Hämta workouts för programmet (återanvänder befintlig endpoint).
-  //    Vi använder detta för att kunna visa workoutets "Name" i headern.
+  // Toggle exercise library visibility (desktop only)
+  const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
+
+  // Listen for mobile menu event
+  useEffect(() => {
+    const handleOpenLibrary = () => {
+      setShowExerciseLibrary(true)
+    }
+    window.addEventListener('openExerciseLibrary', handleOpenLibrary)
+    return () =>
+      window.removeEventListener('openExerciseLibrary', handleOpenLibrary)
+  }, [])
+
+  // Fetch workouts for the program
   const {
     data: workouts = [],
     isPending: isWorkoutsLoading,
@@ -61,7 +75,7 @@ export function WorkoutDetailPage() {
     [workouts, workoutId],
   )
 
-  // 2) Hämta workoutets övningar (WorkoutExercise)
+  // Fetch workout exercises
   const {
     data: workoutExercises = [],
     isPending: isWorkoutExercisesLoading,
@@ -95,11 +109,11 @@ export function WorkoutDetailPage() {
     }
   }, [isWorkoutExercisesError, workoutExercisesError])
 
-  // 3) Exercise library (server-side filter via query params)
+  // Exercise library filters
   const [muscleGroup, setMuscleGroup] = useState('')
   const [equipment, setEquipment] = useState('')
   const [difficulty, setDifficulty] = useState('')
-  const [search, setSearch] = useState('') // client-side textfilter (utan refetch per keypress)
+  const [search, setSearch] = useState('')
 
   const exerciseQueryKey = useMemo(
     () => ['exercises', { muscleGroup, equipment, difficulty }] as const,
@@ -150,7 +164,7 @@ export function WorkoutDetailPage() {
     return exercises.filter((e) => e.name.toLowerCase().includes(term))
   }, [exercises, search])
 
-  // 4) Modal state för att skapa WorkoutExercise
+  // Modal state for creating WorkoutExercise
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
     null,
@@ -250,8 +264,69 @@ export function WorkoutDetailPage() {
     })
   }
 
+  // Render exercise library UI component
+  const ExerciseLibrarySection = () => (
+    <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold text-gray-900">
+          Exercise Library
+        </h2>
+        <p className="text-sm text-gray-600">
+          Filter and search exercises to add to this workout.
+        </p>
+      </div>
+
+      <ExerciseFilters
+        muscleGroup={muscleGroup}
+        setMuscleGroup={setMuscleGroup}
+        equipment={equipment}
+        setEquipment={setEquipment}
+        difficulty={difficulty}
+        setDifficulty={setDifficulty}
+        search={search}
+        setSearch={setSearch}
+      />
+
+      {isExercisesLoading ? (
+        <p className="text-sm text-gray-600">Loading exercises...</p>
+      ) : filteredExercises.length === 0 ? (
+        <p className="text-sm text-gray-600">No exercises match the filters.</p>
+      ) : (
+        <ul className="divide-y rounded-md border">
+          {filteredExercises.map((ex) => (
+            <li
+              key={ex.id}
+              className="p-3 flex items-start justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-gray-900 truncate">{ex.name}</p>
+                <p className="text-xs text-gray-600">
+                  {humanizeEnum(ex.muscleGroup)} • {humanizeEnum(ex.equipment)}{' '}
+                  • {humanizeEnum(ex.difficulty)}
+                </p>
+                {ex.description && (
+                  <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                    {ex.description}
+                  </p>
+                )}
+              </div>
+
+              <button
+                className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                onClick={() => openAddModal(ex)}
+              >
+                Add
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-gray-900">
@@ -270,117 +345,16 @@ export function WorkoutDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* LEFT: Exercise library */}
+      {/* Desktop layout: 2-column grid */}
+      <div className="hidden lg:grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* LEFT: Exercise Library (desktop only) */}
+        <ExerciseLibrarySection />
+
+        {/* RIGHT: Current Exercises */}
         <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Exercise library
-            </h2>
-            <p className="text-sm text-gray-600">
-              Filter server-side via query params, and search client-side by
-              name.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
-                MuscleGroup
-              </label>
-              <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                value={muscleGroup}
-                onChange={(e) => setMuscleGroup(e.target.value)}
-                placeholder="e.g. Chest"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
-                Equipment
-              </label>
-              <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                value={equipment}
-                onChange={(e) => setEquipment(e.target.value)}
-                placeholder="e.g. Barbell"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
-                Difficulty
-              </label>
-              <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value)}
-                placeholder="e.g. Beginner"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-700">
-                Search
-              </label>
-              <input
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name..."
-              />
-            </div>
-          </div>
-
-          {isExercisesLoading ? (
-            <p className="text-sm text-gray-600">Loading exercises...</p>
-          ) : filteredExercises.length === 0 ? (
-            <p className="text-sm text-gray-600">
-              No exercises match the filters.
-            </p>
-          ) : (
-            <ul className="divide-y rounded-md border">
-              {filteredExercises.map((ex) => (
-                <li
-                  key={ex.id}
-                  className="p-3 flex items-start justify-between gap-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-900 truncate">
-                      {ex.name}
-                    </p>
-                    <p className="text-xs text-gray-600">
-                      {humanizeEnum(ex.muscleGroup)} •{' '}
-                      {humanizeEnum(ex.equipment)} •{' '}
-                      {humanizeEnum(ex.difficulty)}
-                    </p>
-                    {ex.description && (
-                      <p className="text-sm text-gray-700 mt-1 line-clamp-2">
-                        {ex.description}
-                      </p>
-                    )}
-                  </div>
-
-                  <button
-                    className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                    onClick={() => openAddModal(ex)}
-                  >
-                    Add
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* RIGHT: WorkoutExercises */}
-        <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Exercises in workout
-            </h2>
-          </div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Exercises in {workout?.name || 'Workout'}
+          </h2>
 
           {isWorkoutExercisesLoading ? (
             <p className="text-sm text-gray-600">
@@ -416,7 +390,59 @@ export function WorkoutDetailPage() {
         </section>
       </div>
 
-      {/* Modal */}
+      {/* Mobile layout: stacked, exercise library hidden by default */}
+      <div className="lg:hidden space-y-6">
+        {/* Current Exercises */}
+        <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Exercises in {workout?.name || 'Workout'}
+          </h2>
+
+          <button
+            onClick={() => setShowExerciseLibrary(!showExerciseLibrary)}
+            className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 transition-colors"
+          >
+            {showExerciseLibrary ? '✕ Hide Library' : '+ Add Exercise'}
+          </button>
+
+          {isWorkoutExercisesLoading ? (
+            <p className="text-sm text-gray-600">
+              Loading workout exercises...
+            </p>
+          ) : workoutExercises.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No exercises yet. Add one from the library.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {workoutExercises.map((we) => (
+                <li key={we.id} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-gray-900">
+                      {we.exerciseName}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      {we.sets} x {we.reps}
+                      {we.weight != null ? ` @ ${we.weight}` : ''}
+                    </p>
+                  </div>
+                  {we.notes && (
+                    <p className="text-sm text-gray-700 mt-1">{we.notes}</p>
+                  )}
+                  <p className="text-xs text-gray-400 mt-2">
+                    Added: {new Date(we.createdAt).toLocaleDateString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Exercise Library - only shown when toggled on mobile */}
+        {showExerciseLibrary && <ExerciseLibrarySection />}
+      </div>
+
+      {/* Modal for adding exercise */}
       {isAddOpen && selectedExercise && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-4">
@@ -506,13 +532,6 @@ export function WorkoutDetailPage() {
             </form>
           </div>
         </div>
-      )}
-
-      {/* Edge-case: om workoutId inte hittas i listan */}
-      {!isWorkoutsLoading && workouts.length > 0 && !workout && (
-        <p className="text-sm text-red-600">
-          Workout not found in this program (or you do not have access).
-        </p>
       )}
     </div>
   )
