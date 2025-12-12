@@ -3,18 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Authorize]
-[Route("api/trainingprograms/{workoutId:guid}/")]
+[Route("api/[controller]")]
 public class ExerciseController : ControllerBase
 {
     private readonly ExerciseService _exerciseService;
-    private readonly WorkoutService _workoutService;
 
-    public ExerciseController(
-        ExerciseService exerciseService,
-        WorkoutService workoutService)
+    public ExerciseController(ExerciseService exerciseService)
     {
         _exerciseService = exerciseService;
-        _workoutService = workoutService;
     }
 
     [HttpGet]
