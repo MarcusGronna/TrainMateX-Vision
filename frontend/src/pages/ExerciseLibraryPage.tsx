@@ -1,44 +1,12 @@
 import type { Exercise } from '@/types/Exercise'
 import { humanizeEnum } from '@/lib/humanizeEnum'
+import { DIFFICULTIES, EQUIPMENT, MUSCLE_GROUPS } from '@/lib/exerciseEnums'
+import { ExerciseFilters } from '@/components/ExerciseFilters'
 
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
-
-// Enum values from backend
-const MUSCLE_GROUPS = [
-  'Chest',
-  'Back',
-  'Traps',
-  'Lats',
-  'Legs',
-  'Quads',
-  'Hamstrings',
-  'Glutes',
-  'Shoulders',
-  'Arms',
-  'Biceps',
-  'Triceps',
-  'Core',
-  'Fullbody',
-  'Cardio',
-]
-
-const EQUIPMENT = [
-  'Barbell',
-  'Dumbbell',
-  'BodyWeight',
-  'Kettlebell',
-  'Machine',
-  'Cable',
-  'ResistanceBand',
-  'SmithMachine',
-  'Bench',
-  'PullUpBar',
-]
-
-const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced']
 
 export function ExerciseLibraryPage() {
   const { getToken } = useAuth()
@@ -100,51 +68,16 @@ export function ExerciseLibraryPage() {
     <div className="mx-auto max-w-3xl p-4 space-y-4">
       <h1 className="text-2xl font-semibold text-gray-900">Exercise library</h1>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 rounded-xl border bg-white p-4 shadow-sm">
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 bg-white"
-          value={muscleGroup}
-          onChange={(e) => setMuscleGroup(e.target.value)}
-        >
-          <option value="">All Muscle Groups</option>
-          {MUSCLE_GROUPS.map((mg) => (
-            <option key={mg} value={mg}>
-              {humanizeEnum(mg)}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 bg-white"
-          value={equipment}
-          onChange={(e) => setEquipment(e.target.value)}
-        >
-          <option value="">All Equipment</option>
-          {EQUIPMENT.map((eq) => (
-            <option key={eq} value={eq}>
-              {humanizeEnum(eq)}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className="rounded-md border border-gray-300 px-3 py-2 bg-white"
-          value={difficulty}
-          onChange={(e) => setDifficulty(e.target.value)}
-        >
-          <option value="">All Difficulties</option>
-          {DIFFICULTIES.map((diff) => (
-            <option key={diff} value={diff}>
-              {diff}
-            </option>
-          ))}
-        </select>
-
-        <input
-          className="rounded-md border border-gray-300 px-3 py-2"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name..."
+      <div className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+        <ExerciseFilters
+          muscleGroup={muscleGroup}
+          setMuscleGroup={setMuscleGroup}
+          equipment={equipment}
+          setEquipment={setEquipment}
+          difficulty={difficulty}
+          setDifficulty={setDifficulty}
+          search={search}
+          setSearch={setSearch}
         />
       </div>
 
