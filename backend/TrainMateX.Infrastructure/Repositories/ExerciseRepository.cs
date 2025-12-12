@@ -19,11 +19,24 @@ public class ExerciseRepository : IExerciseRepository
     {
         IQueryable<Exercise> query = _dbContext.Exercises;
 
-        if (!string.IsNullOrWhiteSpace(muscleGroup))
+        if (!string.IsNullOrWhiteSpace(muscleGroup) &&
+            Enum.TryParse<MuscleGroup>(muscleGroup, ignoreCase: true, out var parsedMuscleGroup))
         {
-            query = query.Where(e => e.MuscleGroup == muscleGroup);
+            query = query.Where(e => e.MuscleGroup == parsedMuscleGroup);
         }
 
-        if (!string.Is)
+        if (!string.IsNullOrWhiteSpace(equipment) &&
+            Enum.TryParse<Equipment>(equipment, ignoreCase: true, out var parsedEquipment))
+        {
+            query = query.Where(e => e.Equipment == parsedEquipment);
+        }
+
+        if (!string.IsNullOrWhiteSpace(difficulty) &&
+                Enum.TryParse<Difficulty>(difficulty, ignoreCase: true, out var parsedDifficulty))
+        {
+            query = query.Where(e => e.Difficulty == parsedDifficulty);
+        }
+
+        return await query.ToListAsync(ct);
     }
 }
