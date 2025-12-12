@@ -7,13 +7,11 @@ var builder = WebApplication.CreateBuilder(args);
 var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
     ?? new[] { "http://localhost:5173" };
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Infrastructure (DbContext m.m.)
+// Infrastructure (DbContext, Dependency injection m.m.)
 builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddScoped<UserProfileService>();
