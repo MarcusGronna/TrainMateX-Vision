@@ -8,6 +8,7 @@ export type WorkoutExercise = {
   weight?: number | null
   notes?: string | null
   createdAt: string
+  updatedAt: string
 }
 
 export type CreateWorkoutExerciseInput = {
@@ -16,4 +17,11 @@ export type CreateWorkoutExerciseInput = {
   reps: number
   weight?: number
   notes?: string
+}
+
+export type UpdateWorkoutExerciseInput = {
+  sets: number
+  reps: number
+  weight?: number | null
+  notes?: string | null
 }
