@@ -10,3 +10,8 @@ public record CreateWorkoutRequest(
     string Name,
     string? DayOfWeek,
     string? Notes);
+
+public record UpdateWorkoutRequest(
+    string Name,
+    string? DayOfWeek,
+    string? Notes);

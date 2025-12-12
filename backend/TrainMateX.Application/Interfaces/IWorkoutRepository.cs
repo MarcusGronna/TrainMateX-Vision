@@ -8,5 +8,7 @@ public interface IWorkoutRepository
 
     Task AddAsync(Workout workout, CancellationToken ct = default);
 
+    void Remove(Workout workout);
+
     Task SaveChangesAsync(CancellationToken ct = default);
 }

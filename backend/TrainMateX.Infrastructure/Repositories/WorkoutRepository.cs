@@ -37,6 +37,12 @@ public class WorkoutRepository : IWorkoutRepository
             .ToListAsync(ct);
     }
 
+    public void Remove(Workout workout)
+    {
+        _dbContext.Workouts.Remove(workout);
+    }
+
+
     public Task SaveChangesAsync(CancellationToken ct = default)
     {
         return _dbContext.SaveChangesAsync(ct);
