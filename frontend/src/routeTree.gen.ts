@@ -9,9 +9,16 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ExercisesRouteImport } from './routes/exercises'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProgramsProgramIdRouteImport } from './routes/programs/$programId'
+import { Route as ProgramsProgramIdWorkoutsWorkoutIdRouteImport } from './routes/programs/$programId/workouts/$workoutId'
 
+const ExercisesRoute = ExercisesRouteImport.update({
+  id: '/exercises',
+  path: '/exercises',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -22,35 +29,68 @@ const ProgramsProgramIdRoute = ProgramsProgramIdRouteImport.update({
   path: '/programs/$programId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgramsProgramIdWorkoutsWorkoutIdRoute =
+  ProgramsProgramIdWorkoutsWorkoutIdRouteImport.update({
+    id: '/workouts/$workoutId',
+    path: '/workouts/$workoutId',
+    getParentRoute: () => ProgramsProgramIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/exercises': typeof ExercisesRoute
+  '/programs/$programId': typeof ProgramsProgramIdRouteWithChildren
+  '/programs/$programId/workouts/$workoutId': typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/exercises': typeof ExercisesRoute
+  '/programs/$programId': typeof ProgramsProgramIdRouteWithChildren
+  '/programs/$programId/workouts/$workoutId': typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/programs/$programId': typeof ProgramsProgramIdRoute
+  '/exercises': typeof ExercisesRoute
+  '/programs/$programId': typeof ProgramsProgramIdRouteWithChildren
+  '/programs/$programId/workouts/$workoutId': typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/programs/$programId'
+  fullPaths:
+    | '/'
+    | '/exercises'
+    | '/programs/$programId'
+    | '/programs/$programId/workouts/$workoutId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/programs/$programId'
-  id: '__root__' | '/' | '/programs/$programId'
+  to:
+    | '/'
+    | '/exercises'
+    | '/programs/$programId'
+    | '/programs/$programId/workouts/$workoutId'
+  id:
+    | '__root__'
+    | '/'
+    | '/exercises'
+    | '/programs/$programId'
+    | '/programs/$programId/workouts/$workoutId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ProgramsProgramIdRoute: typeof ProgramsProgramIdRoute
+  ExercisesRoute: typeof ExercisesRoute
+  ProgramsProgramIdRoute: typeof ProgramsProgramIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/exercises': {
+      id: '/exercises'
+      path: '/exercises'
+      fullPath: '/exercises'
+      preLoaderRoute: typeof ExercisesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -65,12 +105,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgramsProgramIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/programs/$programId/workouts/$workoutId': {
+      id: '/programs/$programId/workouts/$workoutId'
+      path: '/workouts/$workoutId'
+      fullPath: '/programs/$programId/workouts/$workoutId'
+      preLoaderRoute: typeof ProgramsProgramIdWorkoutsWorkoutIdRouteImport
+      parentRoute: typeof ProgramsProgramIdRoute
+    }
   }
 }
 
+interface ProgramsProgramIdRouteChildren {
+  ProgramsProgramIdWorkoutsWorkoutIdRoute: typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
+}
+
+const ProgramsProgramIdRouteChildren: ProgramsProgramIdRouteChildren = {
+  ProgramsProgramIdWorkoutsWorkoutIdRoute:
+    ProgramsProgramIdWorkoutsWorkoutIdRoute,
+}
+
+const ProgramsProgramIdRouteWithChildren =
+  ProgramsProgramIdRoute._addFileChildren(ProgramsProgramIdRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ProgramsProgramIdRoute: ProgramsProgramIdRoute,
+  ExercisesRoute: ExercisesRoute,
+  ProgramsProgramIdRoute: ProgramsProgramIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
