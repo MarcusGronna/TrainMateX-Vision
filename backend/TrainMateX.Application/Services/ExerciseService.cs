@@ -7,5 +7,17 @@ public class ExerciseService
         _repository = repository;
     }
 
-    public async Task<IReadOnlyList<Exercise>>
+    public async Task<IReadOnlyList<Exercise>> GetAllAsync(
+        MuscleGroup? muscleGroup,
+        Equipment? equipment,
+        Difficulty? difficulty,
+        CancellationToken ct = default
+    )
+    {
+        return await _repository.GetAllAsync(
+            muscleGroup,
+            equipment,
+            difficulty,
+            ct);
+    }
 }
