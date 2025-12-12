@@ -5,9 +5,9 @@ public class Exercise
     public string Name { get; set; } = null!;
     public string? Description { get; set; }
     public string Category { get; set; } = null!;
-    public string MuscleGroup { get; set; } = null!;
-    public string Equipment { get; set; } = null!;
-    public string Difficulty { get; set; } = null!;
+    public MuscleGroup MuscleGroup { get; set; }
+    public Equipment Equipment { get; set; }
+    public Difficulty Difficulty { get; set; }
 
     public ICollection<WorkoutExercise> WorkoutExercises { get; set; } = new List<WorkoutExercise>();
 }
