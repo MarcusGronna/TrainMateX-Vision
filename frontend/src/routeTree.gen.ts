@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ExercisesRouteImport } from './routes/exercises'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProgramsProgramIdRouteImport } from './routes/programs/$programId'
+import { Route as ProgramsProgramIdIndexRouteImport } from './routes/programs/$programId/index'
 import { Route as ProgramsProgramIdWorkoutsWorkoutIdRouteImport } from './routes/programs/$programId/workouts/$workoutId'
 
 const ExercisesRoute = ExercisesRouteImport.update({
@@ -29,6 +30,11 @@ const ProgramsProgramIdRoute = ProgramsProgramIdRouteImport.update({
   path: '/programs/$programId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgramsProgramIdIndexRoute = ProgramsProgramIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProgramsProgramIdRoute,
+} as any)
 const ProgramsProgramIdWorkoutsWorkoutIdRoute =
   ProgramsProgramIdWorkoutsWorkoutIdRouteImport.update({
     id: '/workouts/$workoutId',
@@ -40,12 +46,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/exercises': typeof ExercisesRoute
   '/programs/$programId': typeof ProgramsProgramIdRouteWithChildren
+  '/programs/$programId/': typeof ProgramsProgramIdIndexRoute
   '/programs/$programId/workouts/$workoutId': typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/exercises': typeof ExercisesRoute
-  '/programs/$programId': typeof ProgramsProgramIdRouteWithChildren
+  '/programs/$programId': typeof ProgramsProgramIdIndexRoute
   '/programs/$programId/workouts/$workoutId': typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
 }
 export interface FileRoutesById {
@@ -53,6 +60,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/exercises': typeof ExercisesRoute
   '/programs/$programId': typeof ProgramsProgramIdRouteWithChildren
+  '/programs/$programId/': typeof ProgramsProgramIdIndexRoute
   '/programs/$programId/workouts/$workoutId': typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
 }
 export interface FileRouteTypes {
@@ -61,6 +69,7 @@ export interface FileRouteTypes {
     | '/'
     | '/exercises'
     | '/programs/$programId'
+    | '/programs/$programId/'
     | '/programs/$programId/workouts/$workoutId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -73,6 +82,7 @@ export interface FileRouteTypes {
     | '/'
     | '/exercises'
     | '/programs/$programId'
+    | '/programs/$programId/'
     | '/programs/$programId/workouts/$workoutId'
   fileRoutesById: FileRoutesById
 }
@@ -105,6 +115,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgramsProgramIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/programs/$programId/': {
+      id: '/programs/$programId/'
+      path: '/'
+      fullPath: '/programs/$programId/'
+      preLoaderRoute: typeof ProgramsProgramIdIndexRouteImport
+      parentRoute: typeof ProgramsProgramIdRoute
+    }
     '/programs/$programId/workouts/$workoutId': {
       id: '/programs/$programId/workouts/$workoutId'
       path: '/workouts/$workoutId'
@@ -116,10 +133,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface ProgramsProgramIdRouteChildren {
+  ProgramsProgramIdIndexRoute: typeof ProgramsProgramIdIndexRoute
   ProgramsProgramIdWorkoutsWorkoutIdRoute: typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
 }
 
 const ProgramsProgramIdRouteChildren: ProgramsProgramIdRouteChildren = {
+  ProgramsProgramIdIndexRoute: ProgramsProgramIdIndexRoute,
   ProgramsProgramIdWorkoutsWorkoutIdRoute:
     ProgramsProgramIdWorkoutsWorkoutIdRoute,
 }

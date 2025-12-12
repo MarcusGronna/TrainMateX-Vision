@@ -2,7 +2,7 @@ import type { TrainingProgram } from '@/types/TrainingProgram'
 import type { CreateWorkoutInput, Workout } from '@/types/Workout'
 import { useAuth } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams } from '@tanstack/react-router'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useState, type FormEvent } from 'react'
 import { toast } from 'react-toastify'
 
@@ -157,6 +157,8 @@ export function ProgramDetailPage() {
     })
   }
 
+  const navigate = useNavigate()
+
   if (isProgramLoading && !program) {
     return <p className="mt-10 text-center text-gray-600">Loading program...</p>
   }
@@ -250,28 +252,35 @@ export function ProgramDetailPage() {
           </p>
         ) : (
           <ul className="space-y-3">
-            {workouts.map((w) => (
-              <li key={w.id}>
+            {workouts.map((workout) => (
+              <li key={workout.id}>
                 <Link
                   to="/programs/$programId/workouts/$workoutId"
-                  params={{ programId, workoutId: w.id }}
+                  params={{
+                    programId: program.id.toString(),
+                    workoutId: workout.id.toString(),
+                  }}
                   className="block rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition"
                 >
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">{w.name}</h3>
-                    {w.dayOfWeek && (
+                    <h3 className="font-semibold text-gray-900">
+                      {workout.name}
+                    </h3>
+                    {workout.dayOfWeek && (
                       <span className="text-xs uppercase text-gray-500">
-                        {w.dayOfWeek}
+                        {workout.dayOfWeek}
                       </span>
                     )}
                   </div>
 
-                  {w.notes && (
-                    <p className="mt-1 text-sm text-gray-700">{w.notes}</p>
+                  {workout.notes && (
+                    <p className="mt-1 text-sm text-gray-700">
+                      {workout.notes}
+                    </p>
                   )}
 
                   <p className="mt-2 text-xs text-gray-400">
-                    Created: {new Date(w.createdAt).toLocaleDateString()}
+                    Created: {new Date(workout.createdAt).toLocaleDateString()}
                   </p>
                 </Link>
               </li>
