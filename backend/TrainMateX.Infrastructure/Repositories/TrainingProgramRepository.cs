@@ -33,6 +33,11 @@ public class TrainingProgramRepository : ITrainingProgramRepository
             );
     }
 
+    public void Remove(TrainingProgram program)
+    {
+        _dbContext.TrainingPrograms.Remove(program);
+    }
+
     public Task SaveChangesAsync(CancellationToken ct = default)
     {
         return _dbContext.SaveChangesAsync(ct);

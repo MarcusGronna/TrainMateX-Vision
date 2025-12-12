@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TrainMateX.Domain.Entities;
 
 namespace TrainMateX.Infrastructure.Persistence;
@@ -11,6 +12,9 @@ public class TrainMateXDbContext : DbContext
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<TrainingProgram> TrainingPrograms => Set<TrainingProgram>();
     public DbSet<Workout> Workouts => Set<Workout>();
+
+    public DbSet<Exercise> Exercises => Set<Exercise>();
+    public DbSet<WorkoutExercise> WorkoutExercises => Set<WorkoutExercise>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -26,6 +30,24 @@ public class TrainMateXDbContext : DbContext
             .WithMany(u => u.TrainingPrograms)
             .HasForeignKey(tp => tp.UserProfileId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<WorkoutExercise>(we =>
+        {
+            we.HasKey(x => x.Id);
+
+            we.HasOne(x => x.Workout)
+                .WithMany(w => w.WorkoutExercises)
+                .HasForeignKey(x => x.WorkoutId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            we.HasOne(x => x.Exercise)
+                .WithMany(e => e.WorkoutExercises)
+                .HasForeignKey(x => x.ExerciseId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            we.Property(x => x.Sets).IsRequired();
+            we.Property(x => x.Reps).IsRequired();
+        });
 
         modelBuilder.Entity<Workout>(entity =>
         {
@@ -48,5 +70,22 @@ public class TrainMateXDbContext : DbContext
                 .HasForeignKey(w => w.TrainingProgramId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.MuscleGroup)
+            .HasConversion(
+                new EnumToStringConverter<MuscleGroup>());
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.Equipment)
+            .HasConversion(new EnumToStringConverter<Equipment>());
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.Difficulty)
+            .HasConversion(new EnumToStringConverter<Difficulty>());
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.Category)
+            .HasConversion(new EnumToStringConverter<Category>());
     }
 }

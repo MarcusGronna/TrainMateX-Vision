@@ -21,6 +21,13 @@ public class WorkoutRepository : IWorkoutRepository
                .FirstOrDefaultAsync(w => w.Id == id, ct);
     }
 
+    public async Task<Workout?> GetByIdWithProgramAsync(Guid id, CancellationToken ct = default)
+    {
+        return await _dbContext.Workouts
+            .Include(w => w.TrainingProgram)
+            .FirstOrDefaultAsync(w => w.Id == id, ct);
+    }
+
     public async Task<IReadOnlyList<Workout>> GetByProgramIdAsync(Guid trainingProgramId, CancellationToken ct = default)
     {
         return await _dbContext.Workouts
@@ -29,6 +36,12 @@ public class WorkoutRepository : IWorkoutRepository
             .ThenBy(w => w.CreatedAt)
             .ToListAsync(ct);
     }
+
+    public void Remove(Workout workout)
+    {
+        _dbContext.Workouts.Remove(workout);
+    }
+
 
     public Task SaveChangesAsync(CancellationToken ct = default)
     {

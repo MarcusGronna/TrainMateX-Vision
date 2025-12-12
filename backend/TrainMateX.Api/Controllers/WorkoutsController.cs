@@ -86,4 +86,63 @@ public class WorkoutsController : ControllerBase
 
         return CreatedAtAction(nameof(GetForProgram), new { trainingProgramId }, response);
     }
+
+    [HttpPut("{workoutId:guid}")]
+    public async Task<ActionResult<WorkoutResponse>> Update(
+    Guid trainingProgramId,
+    Guid workoutId,
+    [FromBody] UpdateWorkoutRequest request,
+    CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest("Name is required");
+
+        var clerkUserId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Missing Clerk user id claim");
+
+        var userProfile = await _userProfileService.GetOrCreateAsync(
+            clerkUserId,
+            name: User.FindFirst("full_name")?.Value,
+            email: User.FindFirstValue("email"),
+            ct
+        );
+
+        var updated = await _workoutService.UpdateForProgramAsync(
+            trainingProgramId, workoutId, userProfile.Id, request, ct);
+
+        if (updated is null) return NotFound();
+
+        return Ok(new WorkoutResponse(
+            updated.Id,
+            updated.TrainingProgramId,
+            updated.Name,
+            updated.DayOfWeek,
+            updated.Notes,
+            updated.CreatedAt));
+    }
+
+    [HttpDelete("{workoutId:guid}")]
+    public async Task<IActionResult> Delete(
+        Guid trainingProgramId,
+        Guid workoutId,
+        CancellationToken ct)
+    {
+        var clerkUserId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Missing Clerk user id claim");
+
+        var userProfile = await _userProfileService.GetOrCreateAsync(
+            clerkUserId,
+            name: User.FindFirst("full_name")?.Value,
+            email: User.FindFirstValue("email"),
+            ct
+        );
+
+        var deleted = await _workoutService.DeleteForProgramAsync(
+            trainingProgramId, workoutId, userProfile.Id, ct);
+
+        if (!deleted) return NotFound();
+
+        return NoContent();
+    }
+
 }

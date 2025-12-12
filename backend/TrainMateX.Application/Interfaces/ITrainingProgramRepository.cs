@@ -16,5 +16,7 @@ public interface ITrainingProgramRepository
         CancellationToken ct = default
     );
 
+    void Remove(TrainingProgram program);
+
     Task SaveChangesAsync(CancellationToken ct = default);
 }

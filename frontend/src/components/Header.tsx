@@ -1,12 +1,14 @@
-import { Link } from '@tanstack/react-router'
-
+import { Link, useLocation } from '@tanstack/react-router'
 import ClerkHeader from '../integrations/clerk/header-user.tsx'
-
 import { useState } from 'react'
-import { Home, Menu, X } from 'lucide-react'
+import { Dumbbell, Home, Menu, X } from 'lucide-react'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
+  const location = useLocation()
+
+  // Check if we're on a workout detail page
+  const isWorkoutDetailPage = location.pathname.includes('/workouts/')
 
   return (
     <>
@@ -58,6 +60,35 @@ export default function Header() {
             <Home size={20} />
             <span className="font-medium">Home</span>
           </Link>
+
+          <Link
+            to="/exercises"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2',
+            }}
+          >
+            <Dumbbell size={20} />
+            <span className="font-medium">Exercise Library</span>
+          </Link>
+
+          {/* Show "Add Exercise" option only on mobile when on workout detail page */}
+          {isWorkoutDetailPage && (
+            <button
+              onClick={() => {
+                setIsOpen(false)
+                // Scroll to exercise library section (would need to implement via ref)
+                const event = new CustomEvent('openExerciseLibrary')
+                window.dispatchEvent(event)
+              }}
+              className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2 text-left"
+            >
+              <Dumbbell size={20} />
+              <span className="font-medium">Add Exercise</span>
+            </button>
+          )}
         </nav>
 
         <div className="p-4 border-t border-gray-700 bg-gray-800 flex flex-col gap-2">
