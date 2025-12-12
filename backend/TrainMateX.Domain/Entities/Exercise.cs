@@ -4,7 +4,7 @@ public class Exercise
 
     public string Name { get; set; } = null!;
     public string? Description { get; set; }
-    public string Category { get; set; } = null!;
+    public Category Category { get; set; }
     public MuscleGroup MuscleGroup { get; set; }
     public Equipment Equipment { get; set; }
     public Difficulty Difficulty { get; set; }
