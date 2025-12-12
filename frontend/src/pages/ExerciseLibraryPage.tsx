@@ -1,6 +1,5 @@
 import type { Exercise } from '@/types/Exercise'
 import { humanizeEnum } from '@/lib/humanizeEnum'
-import { DIFFICULTIES, EQUIPMENT, MUSCLE_GROUPS } from '@/lib/exerciseEnums'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
 
 import { useAuth } from '@clerk/clerk-react'

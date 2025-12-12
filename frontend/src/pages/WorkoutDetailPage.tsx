@@ -6,7 +6,6 @@ import type {
 import type { Workout } from '@/types/Workout'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
-import { DIFFICULTIES, EQUIPMENT, MUSCLE_GROUPS } from '@/lib/exerciseEnums'
 
 import { useAuth } from '@clerk/clerk-react'
 import { Link, useParams } from '@tanstack/react-router'
