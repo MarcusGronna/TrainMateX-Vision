@@ -135,12 +135,10 @@ export function TrainingProgramsPage() {
 
   return (
     <div className="max-w-xl mx-auto p-4 space-y-6">
-      {/* Titel */}
       <h1 className="text-2xl font-semibold text-gray-900">
         My Training Programs
       </h1>
 
-      {/* Skapa nytt program */}
       <form
         onSubmit={handleCreate}
         className="space-y-4 bg-white p-4 rounded-xl shadow-sm border"
@@ -192,7 +190,6 @@ export function TrainingProgramsPage() {
         </button>
       </form>
 
-      {/* Lista av program */}
       {isPending ? (
         <p className="text-gray-600 text-center">
           Loading training programs...
