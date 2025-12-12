@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TrainMateX.Domain.Entities;
 
 namespace TrainMateX.Infrastructure.Persistence;
@@ -67,5 +68,22 @@ public class TrainMateXDbContext : DbContext
                 .HasForeignKey(w => w.TrainingProgramId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.MuscleGroup)
+            .HasConversion(
+                new EnumToStringConverter<MuscleGroup>());
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.Equipment)
+            .HasConversion(new EnumToStringConverter<Equipment>());
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.Difficulty)
+            .HasConversion(new EnumToStringConverter<Difficulty>());
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.Category)
+            .HasConversion(new EnumToStringConverter<Category>());
     }
 }
