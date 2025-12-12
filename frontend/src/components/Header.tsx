@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import ClerkHeader from '../integrations/clerk/header-user.tsx'
 
 import { useState } from 'react'
-import { Home, Menu, X } from 'lucide-react'
+import { Dumbbell, Home, Menu, X } from 'lucide-react'
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
@@ -57,6 +57,19 @@ export default function Header() {
           >
             <Home size={20} />
             <span className="font-medium">Home</span>
+          </Link>
+
+          <Link
+            to="/exercises"
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+            activeProps={{
+              className:
+                'flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2',
+            }}
+          >
+            <Dumbbell size={20} />
+            <span className="font-medium">Exercise Library</span>
           </Link>
         </nav>
 
