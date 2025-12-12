@@ -11,5 +11,6 @@ public class Workout
 
     //Navigation
     public TrainingProgram TrainingProgram { get; set; } = null!;
-    public ICollection<WorkoutExercise> WorkoutExercises { get; set; } = new List<WorkoutExercise>();
+    public ICollection<WorkoutExercise> WorkoutExercises { get; set; }
+        = new List<WorkoutExercise>();
 }
