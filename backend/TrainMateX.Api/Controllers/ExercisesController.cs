@@ -4,11 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 [ApiController]
 [Authorize]
 [Route("api/[controller]")]
-public class ExerciseController : ControllerBase
+public class ExercisesController : ControllerBase
 {
     private readonly ExerciseService _exerciseService;
 
-    public ExerciseController(ExerciseService exerciseService)
+    public ExercisesController(ExerciseService exerciseService)
     {
         _exerciseService = exerciseService;
     }
