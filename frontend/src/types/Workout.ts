@@ -5,6 +5,7 @@ export type Workout = {
   dayOfWeek?: string | null
   notes?: string | null
   createdAt: string
+  updatedAt: string
 }
 
 export type CreateWorkoutInput = {
