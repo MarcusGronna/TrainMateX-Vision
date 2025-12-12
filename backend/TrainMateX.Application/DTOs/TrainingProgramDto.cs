@@ -11,3 +11,9 @@ public record CreateTrainingProgramRequest(
     string? Description,
     string? Level
 );
+
+public record UpdateTrainingProgramRequest(
+    string Name,
+    string? Description,
+    string? Level
+);

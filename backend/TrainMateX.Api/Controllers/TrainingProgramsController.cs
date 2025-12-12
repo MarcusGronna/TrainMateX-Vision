@@ -95,4 +95,48 @@ public class TrainingProgramsController : ControllerBase
 
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<TrainingProgramDto>> Update(
+    Guid id,
+    [FromBody] UpdateTrainingProgramRequest request,
+    CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest("Name is required.");
+
+        var clerkUserId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Missing Clerk user id claim");
+
+        var profile = await _userProfileService.GetOrCreateAsync(
+            clerkUserId,
+            User.FindFirst("full_name")?.Value,
+            User.FindFirstValue("email"),
+            ct
+        );
+
+        var updated = await _trainingProgramService.UpdateAsync(id, profile.Id, request, ct);
+        if (updated is null) return NotFound();
+
+        return Ok(updated);
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var clerkUserId = User.FindFirst("sub")?.Value
+            ?? throw new InvalidOperationException("Missing Clerk user id claim");
+
+        var profile = await _userProfileService.GetOrCreateAsync(
+            clerkUserId,
+            User.FindFirst("full_name")?.Value,
+            User.FindFirstValue("email"),
+            ct
+        );
+
+        var deleted = await _trainingProgramService.DeleteAsync(id, profile.Id, ct);
+        if (!deleted) return NotFound();
+
+        return NoContent();
+    }
 }
