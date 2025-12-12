@@ -36,4 +36,9 @@ public class ExerciseRepository : IExerciseRepository
 
         return await query.ToListAsync(ct);
     }
+
+    public Task<Exercise?> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        return _dbContext.Exercises.FirstOrDefaultAsync(e => e.Id == id, ct);
+    }
 }
