@@ -2,7 +2,7 @@ import type { TrainingProgram } from '@/types/TrainingProgram'
 import type { CreateWorkoutInput, Workout } from '@/types/Workout'
 import { useAuth } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useState, type FormEvent } from 'react'
 import { toast } from 'react-toastify'
 
@@ -156,8 +156,6 @@ export function ProgramDetailPage() {
       notes: notes.trim() || undefined,
     })
   }
-
-  const navigate = useNavigate()
 
   if (isProgramLoading && !program) {
     return <p className="mt-10 text-center text-gray-600">Loading program...</p>
