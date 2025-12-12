@@ -2,7 +2,7 @@ import type { TrainingProgram } from '@/types/TrainingProgram'
 import type { CreateWorkoutInput, Workout } from '@/types/Workout'
 import { useAuth } from '@clerk/clerk-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useParams } from '@tanstack/react-router'
+import { Link, useParams } from '@tanstack/react-router'
 import { useEffect, useState, type FormEvent } from 'react'
 import { toast } from 'react-toastify'
 
@@ -251,24 +251,29 @@ export function ProgramDetailPage() {
         ) : (
           <ul className="space-y-3">
             {workouts.map((w) => (
-              <li
-                key={w.id}
-                className="rounded-xl border bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-900">{w.name}</h3>
-                  {w.dayOfWeek && (
-                    <span className="text-xs uppercase text-gray-500">
-                      {w.dayOfWeek}
-                    </span>
+              <li key={w.id}>
+                <Link
+                  to="/programs/$programId/workouts/$workoutId"
+                  params={{ programId, workoutId: w.id }}
+                  className="block rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">{w.name}</h3>
+                    {w.dayOfWeek && (
+                      <span className="text-xs uppercase text-gray-500">
+                        {w.dayOfWeek}
+                      </span>
+                    )}
+                  </div>
+
+                  {w.notes && (
+                    <p className="mt-1 text-sm text-gray-700">{w.notes}</p>
                   )}
-                </div>
-                {w.notes && (
-                  <p className="mt-1 text-sm text-gray-700">{w.notes}</p>
-                )}
-                <p className="mt-2 text-xs text-gray-400">
-                  Created: {new Date(w.createdAt).toLocaleDateString()}
-                </p>
+
+                  <p className="mt-2 text-xs text-gray-400">
+                    Created: {new Date(w.createdAt).toLocaleDateString()}
+                  </p>
+                </Link>
               </li>
             ))}
           </ul>
