@@ -1,8 +1,8 @@
 public interface IExerciseRepository
 {
     Task<IReadOnlyList<Exercise>> GetAllAsync(
-        string? muscleGroup,
-        string? equipment,
-        string? difficulty,
+        MuscleGroup? muscleGroup,
+        Equipment? equipment,
+        Difficulty? difficulty,
         CancellationToken ct = default);
 }

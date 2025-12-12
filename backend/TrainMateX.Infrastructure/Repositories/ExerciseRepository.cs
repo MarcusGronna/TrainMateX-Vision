@@ -12,29 +12,26 @@ public class ExerciseRepository : IExerciseRepository
     }
 
     public async Task<IReadOnlyList<Exercise>> GetAllAsync(
-        string? muscleGroup,
-        string? equipment,
-        string? difficulty,
+        MuscleGroup? muscleGroup,
+        Equipment? equipment,
+        Difficulty? difficulty,
         CancellationToken ct = default)
     {
         IQueryable<Exercise> query = _dbContext.Exercises;
 
-        if (!string.IsNullOrWhiteSpace(muscleGroup) &&
-            Enum.TryParse<MuscleGroup>(muscleGroup, ignoreCase: true, out var parsedMuscleGroup))
+        if (muscleGroup is MuscleGroup mg)
         {
-            query = query.Where(e => e.MuscleGroup == parsedMuscleGroup);
+            query = query.Where(e => e.MuscleGroup == mg);
         }
 
-        if (!string.IsNullOrWhiteSpace(equipment) &&
-            Enum.TryParse<Equipment>(equipment, ignoreCase: true, out var parsedEquipment))
+        if (equipment is Equipment eq)
         {
-            query = query.Where(e => e.Equipment == parsedEquipment);
+            query = query.Where(e => e.Equipment == eq);
         }
 
-        if (!string.IsNullOrWhiteSpace(difficulty) &&
-                Enum.TryParse<Difficulty>(difficulty, ignoreCase: true, out var parsedDifficulty))
+        if (difficulty is Difficulty d)
         {
-            query = query.Where(e => e.Difficulty == parsedDifficulty);
+            query = query.Where(e => e.Difficulty == d);
         }
 
         return await query.ToListAsync(ct);
