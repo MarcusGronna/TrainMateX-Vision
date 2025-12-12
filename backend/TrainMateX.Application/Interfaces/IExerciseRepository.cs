@@ -5,4 +5,6 @@ public interface IExerciseRepository
         Equipment? equipment,
         Difficulty? difficulty,
         CancellationToken ct = default);
+
+    Task<Exercise?> GetByIdAsync(Guid id, CancellationToken ct = default);
 }

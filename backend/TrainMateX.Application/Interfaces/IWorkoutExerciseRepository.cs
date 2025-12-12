@@ -4,7 +4,7 @@ public interface IWorkoutExerciseRepository
         Guid workoutId,
         CancellationToken ct = default);
 
-    Task<WorkoutExercise> GetByIdAsync(
+    Task<WorkoutExercise?> GetByIdAsync(
         Guid id,
         CancellationToken ct = default);
 
