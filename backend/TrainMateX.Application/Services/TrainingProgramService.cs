@@ -1,6 +1,3 @@
-using System.ComponentModel;
-using System.Security.Cryptography.X509Certificates;
-
 public class TrainingProgramService
 {
     private readonly ITrainingProgramRepository _repository;
