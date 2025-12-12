@@ -19,6 +19,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<UserProfileService>();
 builder.Services.AddScoped<TrainingProgramService>();
 builder.Services.AddScoped<WorkoutService>();
+builder.Services.AddScoped<ExerciseService>();
 
 builder.Services.AddCors(options =>
 {
