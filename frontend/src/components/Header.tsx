@@ -60,17 +60,15 @@ export default function Header() {
             >
               Training Programs
             </Link>
+            <Link
+              to="/exercises"
+              onClick={() => setIsOpen(false)}
+              className="block px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors"
+              activeProps={{ className: 'bg-gray-700' }}
+            >
+              Exercise Library
+            </Link>
           </SignedIn>
-
-          <Link
-            to="/exercises"
-            onClick={() => setIsOpen(false)}
-            className="block px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors"
-            activeProps={{ className: 'bg-gray-700' }}
-          >
-            Exercise Library
-          </Link>
-
           {isWorkoutDetailPage && (
             <div className="pt-4 border-t border-gray-700">
               <p className="px-4 py-2 text-sm text-gray-400 uppercase tracking-wide">
