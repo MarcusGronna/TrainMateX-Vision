@@ -3,6 +3,7 @@ import { humanizeEnum } from '@/lib/humanizeEnum'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
 import { BackLink } from '@/components/BackLink'
 import { useApi } from '@/lib/api/useApi'
+import { exercisesKeys } from '@/features/exercises/keys'
 
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
@@ -17,7 +18,7 @@ export function ExerciseLibraryPage() {
   const [search, setSearch] = useState('')
 
   const queryKey = useMemo(
-    () => ['exercises', { muscleGroup, equipment, difficulty }] as const,
+    () => exercisesKeys.list({ muscleGroup, equipment, difficulty }),
     [muscleGroup, equipment, difficulty],
   )
 
