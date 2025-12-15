@@ -24,11 +24,11 @@ export function useApi() {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
     const url = `${baseUrl}${cleanEndpoint}`
 
-    console.log('API Request:', {
-      url,
-      token: 'present',
-      timestamp: new Date().toISOString(),
-    })
+    // console.log('API Request:', {
+    //   url,
+    //   token: 'present',
+    //   timestamp: new Date().toISOString(),
+    // })
 
     const response = await fetch(url, {
       headers: {
