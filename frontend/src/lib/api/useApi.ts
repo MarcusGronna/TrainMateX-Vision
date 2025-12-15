@@ -11,19 +11,13 @@ export function useApi() {
 
   /**
    * Makes an authenticated API request to the backend.
-   *
-   * @param path - API path (e.g., 'exercises' or 'trainingprograms/123/workouts')
-   * @param init - Fetch RequestInit options
-   * @returns Parsed JSON response or undefined for 204 No Content
-   * @throws Error with backend message or fallback message
+   * For GET requests that return data, use api<T>().
+   * For DELETE/PUT that return 204, the result will be undefined.
    */
-  async function api<T = unknown>(
-    path: string,
-    init?: RequestInit,
-  ): Promise<T | undefined> {
+  async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const token = await getToken()
     if (!token) {
-      throw new Error('Missing auth token, user not logged in')
+      throw new Error('Missing auth token')
     }
 
     const url = `${import.meta.env.VITE_API_BASE_URL}${path}`
@@ -39,17 +33,25 @@ export function useApi() {
     // Handle errors
     if (!response.ok) {
       const errorText = await response.text()
-      console.log(`Error: ${response.status}`)
-      throw new Error(errorText || `Unknown error. See console for more info.`)
+      throw new Error(errorText || `Request failed (status ${response.status})`)
     }
 
-    // Handle 204 No Content
-    if (response.status === 204) {
-      return undefined
+    // Handle 204 No Content or empty responses
+    if (
+      response.status === 204 ||
+      response.headers.get('content-length') === '0'
+    ) {
+      return undefined as T
+    }
+
+    // Check if there's actually content to parse
+    const text = await response.text()
+    if (!text) {
+      return undefined as T
     }
 
     // Parse JSON response
-    return (await response.json()) as T
+    return JSON.parse(text) as T
   }
 
   return { api }
