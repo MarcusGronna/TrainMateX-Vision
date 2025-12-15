@@ -12,8 +12,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ProgramForm } from '@/features/programs/components/ProgramForm'
 import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
-import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
-import { SectionTitle, SectionSubtitle } from '@/components/ui/SectionTitle'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate, Link } from '@tanstack/react-router'
@@ -33,7 +31,8 @@ export function ProgramDetailPage() {
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
 
   // Confirm delete states
-  const [isDeleteProgramDialogOpen, setIsDeleteProgramDialogOpen] = useState(false)
+  const [isDeleteProgramDialogOpen, setIsDeleteProgramDialogOpen] =
+    useState(false)
   const [workoutToDelete, setWorkoutToDelete] = useState<Workout | null>(null)
 
   // Fetch single program
@@ -64,7 +63,9 @@ export function ProgramDetailPage() {
   } = useQuery<Workout[], Error>({
     queryKey: workoutsKeys.list(programId),
     queryFn: async () => {
-      const result = await api<Workout[]>(`trainingprograms/${programId}/workouts`)
+      const result = await api<Workout[]>(
+        `trainingprograms/${programId}/workouts`,
+      )
       return result ?? []
     },
   })
@@ -74,42 +75,44 @@ export function ProgramDetailPage() {
   }, [isWorkoutsError, workoutsError])
 
   // CREATE workout mutation
-  const createWorkoutMutation = useMutation<Workout, Error, CreateWorkoutInput>({
-    mutationFn: async (input) => {
-      const requestPromise = api<Workout>(
-        `trainingprograms/${programId}/workouts`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        },
-      )
-
-      const result = await toast.promise(requestPromise, {
-        pending: 'Creating workout...',
-        success: 'Workout created',
-        error: {
-          render({ data }) {
-            const e = data as Error | undefined
-            return e?.message ?? 'Failed to create workout'
+  const createWorkoutMutation = useMutation<Workout, Error, CreateWorkoutInput>(
+    {
+      mutationFn: async (input) => {
+        const requestPromise = api<Workout>(
+          `trainingprograms/${programId}/workouts`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(input),
           },
-        },
-      })
+        )
 
-      if (!result) throw new Error('Failed to create workout')
-      return result
-    },
-    onSuccess: async (newWorkout) => {
-      await queryClient.invalidateQueries({
-        queryKey: workoutsKeys.list(programId),
-      })
+        const result = await toast.promise(requestPromise, {
+          pending: 'Creating workout...',
+          success: 'Workout created',
+          error: {
+            render({ data }) {
+              const e = data as Error | undefined
+              return e?.message ?? 'Failed to create workout'
+            },
+          },
+        })
 
-      setIsCreateWorkoutOpen(false)
+        if (!result) throw new Error('Failed to create workout')
+        return result
+      },
+      onSuccess: async (newWorkout) => {
+        await queryClient.invalidateQueries({
+          queryKey: workoutsKeys.list(programId),
+        })
 
-      navigate({
-        to: '/programs/$programId/workouts/$workoutId',
-        params: { programId, workoutId: newWorkout.id },
-      })
+        setIsCreateWorkoutOpen(false)
+
+        navigate({
+          to: '/programs/$programId/workouts/$workoutId',
+          params: { programId, workoutId: newWorkout.id },
+        })
+      },
     },
   )
 
@@ -249,6 +252,26 @@ export function ProgramDetailPage() {
     },
   })
 
+  // DELETE program with optimistic undo - hook called at top level
+  const executeDeleteProgram = useUndoableDelete<
+    TrainingProgram[],
+    TrainingProgram
+  >({
+    queryKey: programsKeys.list(),
+    deleteFn: () => deleteProgramMutation.mutateAsync(),
+    optimisticUpdate: (old) => old?.filter((p) => p.id !== programId) ?? [],
+    getItemLabel: () => program?.name || 'program',
+  })
+
+  // DELETE workout with optimistic undo - hook called at top level
+  const executeDeleteWorkout = useUndoableDelete<Workout[], Workout>({
+    queryKey: workoutsKeys.list(programId),
+    deleteFn: (workout) => deleteWorkoutMutation.mutateAsync(workout.id),
+    optimisticUpdate: (old, workout) =>
+      old?.filter((w) => w.id !== workout.id) ?? [],
+    getItemLabel: (workout) => workout.name,
+  })
+
   // Handlers
   const handleCreateWorkout = (values: CreateWorkoutInput) => {
     if (!values.name.trim()) {
@@ -269,14 +292,9 @@ export function ProgramDetailPage() {
   }
 
   const handleDeleteProgram = () => {
-    const executeDelete = useUndoableDelete<TrainingProgram[]>({
-      queryKey: programsKeys.list(),
-      deleteFn: () => deleteProgramMutation.mutateAsync(),
-      optimisticUpdate: (old) => old?.filter((p) => p.id !== programId) ?? [],
-      itemLabel: program?.name || 'program',
-    })
-
-    executeDelete()
+    if (program) {
+      executeDeleteProgram(program)
+    }
   }
 
   const handleEditWorkout = (values: CreateWorkoutInput) => {
@@ -294,14 +312,7 @@ export function ProgramDetailPage() {
   }
 
   const handleDeleteWorkout = (workout: Workout) => {
-    const executeDelete = useUndoableDelete<Workout[]>({
-      queryKey: workoutsKeys.list(programId),
-      deleteFn: () => deleteWorkoutMutation.mutateAsync(workout.id),
-      optimisticUpdate: (old) => old?.filter((w) => w.id !== workout.id) ?? [],
-      itemLabel: workout.name,
-    })
-
-    executeDelete()
+    executeDeleteWorkout(workout)
   }
 
   const openEditWorkoutModal = (workout: Workout) => {
@@ -312,38 +323,39 @@ export function ProgramDetailPage() {
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
       {/* Header with Edit/Delete Program buttons */}
-      <div className="space-y-4">
-        <SectionTitle
-          description={program?.description ?? undefined}
-          action={
-            program && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsEditProgramOpen(true)}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setIsDeleteProgramDialogOpen(true)}
-                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            )
-          }
-        >
-          {program?.name ?? (isProgramLoading ? 'Loading...' : 'Unknown')}
-        </SectionTitle>
-        
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {program?.name ?? (isProgramLoading ? 'Loading...' : 'Unknown')}
+          </h1>
+          {program?.description && (
+            <p className="text-sm text-gray-600">{program.description}</p>
+          )}
+          {program && (
+            <p className="text-xs text-gray-500">
+              Level: {humanizeEnum(program.level)}
+            </p>
+          )}
+          {/* This is correct, don't touch */}
+          <BackLink to="/" label="Back to Programs" />
+        </div>
+
         {program && (
-          <p className="text-xs text-gray-500">
-            Level: {humanizeEnum(program.level)}
-          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsEditProgramOpen(true)}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setIsDeleteProgramDialogOpen(true)}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
         )}
-        
-        <BackLink to="/programs" label="Back to Programs" />
       </div>
 
       {/* Add Workout Button */}
@@ -357,17 +369,17 @@ export function ProgramDetailPage() {
       </div>
 
       {/* Workouts List */}
-      <Card>
-        <SectionSubtitle>Workouts</SectionSubtitle>
+      <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Workouts</h2>
 
         {isWorkoutsLoading ? (
-          <p className="text-sm text-gray-600 mt-4">Loading workouts...</p>
+          <p className="text-sm text-gray-600">Loading workouts...</p>
         ) : workouts.length === 0 ? (
-          <p className="text-sm text-gray-600 mt-4">
+          <p className="text-sm text-gray-600">
             No workouts yet. Add your first one!
           </p>
         ) : (
-          <ul className="space-y-3 mt-4">
+          <ul className="space-y-3">
             {workouts.map((workout) => (
               <li key={workout.id} className="rounded-lg border p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -376,15 +388,22 @@ export function ProgramDetailPage() {
                     params={{ programId, workoutId: workout.id }}
                     className="flex-1 min-w-0 hover:bg-gray-50 transition-colors rounded-md p-2 -m-2"
                   >
-                    <CardTitle className="text-base">{workout.name}</CardTitle>
+                    <p className="font-semibold text-gray-900">
+                      {workout.name}
+                    </p>
                     {workout.dayOfWeek && (
-                      <CardDescription>{workout.dayOfWeek}</CardDescription>
+                      <p className="text-sm text-gray-600">
+                        {workout.dayOfWeek}
+                      </p>
                     )}
                     {workout.notes && (
-                      <p className="text-sm text-gray-700 mt-1">{workout.notes}</p>
+                      <p className="text-sm text-gray-700 mt-1">
+                        {workout.notes}
+                      </p>
                     )}
                     <p className="text-xs text-gray-400 mt-2">
-                      Created: {new Date(workout.createdAt).toLocaleDateString()}
+                      Created:{' '}
+                      {new Date(workout.createdAt).toLocaleDateString()}
                     </p>
                   </Link>
 
@@ -413,7 +432,7 @@ export function ProgramDetailPage() {
             ))}
           </ul>
         )}
-      </Card>
+      </section>
 
       {/* Create Workout Modal */}
       <Modal
@@ -491,7 +510,9 @@ export function ProgramDetailPage() {
       <ConfirmDialog
         isOpen={!!workoutToDelete}
         onClose={() => setWorkoutToDelete(null)}
-        onConfirm={() => workoutToDelete && handleDeleteWorkout(workoutToDelete)}
+        onConfirm={() =>
+          workoutToDelete && handleDeleteWorkout(workoutToDelete)
+        }
         title="Delete Workout"
         description={`Are you sure you want to delete workout "${workoutToDelete?.name}"? This action cannot be undone.`}
         confirmText="Delete"

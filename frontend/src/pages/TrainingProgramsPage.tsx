@@ -126,15 +126,20 @@ export function TrainingProgramsPage() {
     })
   }
 
-  const handleDeleteProgram = (program: TrainingProgram) => {
-    const executeDelete = useUndoableDelete<TrainingProgram[]>({
-      queryKey: programsKeys.list(),
-      deleteFn: () => deleteProgramMutation.mutateAsync(program.id),
-      optimisticUpdate: (old) => old?.filter((p) => p.id !== program.id) ?? [],
-      itemLabel: program.name,
-    })
+  // DELETE program with optimistic undo - hook called at top level
+  const executeDeleteProgram = useUndoableDelete<
+    TrainingProgram[],
+    TrainingProgram
+  >({
+    queryKey: programsKeys.list(),
+    deleteFn: (program) => deleteProgramMutation.mutateAsync(program.id),
+    optimisticUpdate: (old, program) =>
+      old?.filter((p) => p.id !== program.id) ?? [],
+    getItemLabel: (program) => program.name,
+  })
 
-    executeDelete()
+  const handleDeleteProgram = (program: TrainingProgram) => {
+    executeDeleteProgram(program)
   }
 
   return (

@@ -17,8 +17,6 @@ import { Modal } from '@/components/ui/Modal'
 import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
 import { WorkoutExerciseForm } from '@/features/workoutExercises/components/WorkoutExerciseForm'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
-import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
-import { SectionTitle, SectionSubtitle } from '@/components/ui/SectionTitle'
 
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
@@ -52,9 +50,7 @@ export function WorkoutDetailPage() {
   } = useQuery<Workout, Error>({
     queryKey: workoutsKeys.byId(programId, workoutId),
     queryFn: async () => {
-      const result = await api<Workout>(
-        `trainingprograms/${programId}/workouts/${workoutId}`,
-      )
+      const result = await api<Workout>(`workouts/${workoutId}`)
       if (!result) throw new Error('Workout not found')
       return result
     },
@@ -232,16 +228,16 @@ export function WorkoutDetailPage() {
     },
   })
 
-  // DELETE workout with optimistic undo
-  const handleDeleteWorkout = () => {
-    const executeDelete = useUndoableDelete<Workout[]>({
-      queryKey: workoutsKeys.list(programId),
-      deleteFn: () => deleteWorkoutMutation.mutateAsync(),
-      optimisticUpdate: (old) => old?.filter((w) => w.id !== workoutId) ?? [],
-      itemLabel: workout?.name || 'workout',
-    })
+  // DELETE workout with optimistic undo - hook called at top level
+  const executeDeleteWorkout = useUndoableDelete<Workout[], Workout>({
+    queryKey: workoutsKeys.list(programId),
+    deleteFn: () => deleteWorkoutMutation.mutateAsync(),
+    optimisticUpdate: (old) => old?.filter((w) => w.id !== workoutId) ?? [],
+    getItemLabel: () => workout?.name || 'workout',
+  })
 
-    executeDelete()
+  const handleDeleteWorkout = () => {
+    executeDeleteWorkout(workout!)
   }
 
   // ========== EDIT/DELETE WORKOUT EXERCISE ==========
@@ -299,62 +295,66 @@ export function WorkoutDetailPage() {
     },
   })
 
-  // DELETE workout exercise with optimistic undo
-  const handleDeleteWE = (we: WorkoutExercise) => {
-    const executeDelete = useUndoableDelete<WorkoutExercise[]>({
-      queryKey: workoutExercisesKeys.list(workoutId),
-      deleteFn: () => deleteWorkoutExerciseMutation.mutateAsync(we.id),
-      optimisticUpdate: (old) => old?.filter((ex) => ex.id !== we.id) ?? [],
-      itemLabel: we.exerciseName,
-    })
+  // DELETE workout exercise with optimistic undo - hook called at top level
+  const executeDeleteWorkoutExercise = useUndoableDelete<
+    WorkoutExercise[],
+    WorkoutExercise
+  >({
+    queryKey: workoutExercisesKeys.list(workoutId),
+    deleteFn: (we) => deleteWorkoutExerciseMutation.mutateAsync(we.id),
+    optimisticUpdate: (old, we) => old?.filter((ex) => ex.id !== we.id) ?? [],
+    getItemLabel: (we) => we.exerciseName,
+  })
 
-    executeDelete()
+  // Handler that calls the delete function returned by hook
+  const handleDeleteWE = (we: WorkoutExercise) => {
+    executeDeleteWorkoutExercise(we)
   }
 
   // ========== RENDER HELPERS ==========
   const ExerciseLibrarySection = () => (
-    <Card>
-      <SectionSubtitle>Exercise Library</SectionSubtitle>
-      <CardDescription>
-        Filter and search exercises to add to this workout.
-      </CardDescription>
-
-      <div className="mt-4">
-        <ExerciseFilters
-          muscleGroup={muscleGroup}
-          setMuscleGroup={setMuscleGroup}
-          equipment={equipment}
-          setEquipment={setEquipment}
-          difficulty={difficulty}
-          setDifficulty={setDifficulty}
-          search={search}
-          setSearch={setSearch}
-        />
+    <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold text-gray-900">
+          Exercise Library
+        </h2>
+        <p className="text-sm text-gray-600">
+          Filter and search exercises to add to this workout.
+        </p>
       </div>
 
+      <ExerciseFilters
+        muscleGroup={muscleGroup}
+        setMuscleGroup={setMuscleGroup}
+        equipment={equipment}
+        setEquipment={setEquipment}
+        difficulty={difficulty}
+        setDifficulty={setDifficulty}
+        search={search}
+        setSearch={setSearch}
+      />
+
       {isExercisesLoading ? (
-        <p className="text-sm text-gray-600 mt-4">Loading exercises...</p>
+        <p className="text-sm text-gray-600">Loading exercises...</p>
       ) : filteredExercises.length === 0 ? (
-        <p className="text-sm text-gray-600 mt-4">
-          No exercises match the filters.
-        </p>
+        <p className="text-sm text-gray-600">No exercises match the filters.</p>
       ) : (
-        <ul className="divide-y rounded-md border mt-4">
+        <ul className="divide-y rounded-md border">
           {filteredExercises.map((ex) => (
             <li
               key={ex.id}
               className="p-3 flex items-start justify-between gap-3"
             >
               <div className="min-w-0">
-                <CardTitle className="text-base truncate">{ex.name}</CardTitle>
+                <p className="font-medium text-gray-900 truncate">{ex.name}</p>
                 <p className="text-xs text-gray-600">
                   {humanizeEnum(ex.muscleGroup)} • {humanizeEnum(ex.equipment)}{' '}
                   • {humanizeEnum(ex.difficulty)}
                 </p>
                 {ex.description && (
-                  <CardDescription className="mt-1 line-clamp-2">
+                  <p className="text-sm text-gray-700 mt-1 line-clamp-2">
                     {ex.description}
-                  </CardDescription>
+                  </p>
                 )}
               </div>
 
@@ -368,47 +368,45 @@ export function WorkoutDetailPage() {
           ))}
         </ul>
       )}
-    </Card>
+    </section>
   )
 
   return (
     <div className="mx-auto max-w-7xl p-4">
       <div className="space-y-6">
         {/* Header */}
-        <div className="space-y-4">
-          <SectionTitle
-            action={
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setIsEditWorkoutOpen(true)}
-                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setIsDeleteWorkoutDialogOpen(true)}
-                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            }
-          >
-            {workout?.name ?? (isWorkoutLoading ? 'Loading...' : 'Unknown')}
-          </SectionTitle>
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1 min-w-0">
+            <h1 className="text-2xl font-semibold text-gray-900 truncate">
+              {workout?.name ?? (isWorkoutLoading ? 'Loading...' : 'Unknown')}
+            </h1>
+            {workout?.dayOfWeek && (
+              <p className="text-sm text-gray-600">{workout.dayOfWeek}</p>
+            )}
+            {workout?.notes && (
+              <p className="text-sm text-gray-700">{workout.notes}</p>
+            )}
+            <BackLink
+              to="/programs/$programId"
+              params={{ programId }}
+              label="Back to Program"
+            />
+          </div>
 
-          {workout?.dayOfWeek && (
-            <CardDescription>{workout.dayOfWeek}</CardDescription>
-          )}
-          {workout?.notes && (
-            <p className="text-sm text-gray-700">{workout.notes}</p>
-          )}
-
-          <BackLink
-            to="/programs/$programId"
-            params={{ programId }}
-            label="Back to Program"
-          />
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsEditWorkoutOpen(true)}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setIsDeleteWorkoutDialogOpen(true)}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Delete
+            </button>
+          </div>
         </div>
 
         {/* Mobile: Toggle Exercise Library */}
@@ -426,9 +424,11 @@ export function WorkoutDetailPage() {
           {showExerciseLibrary ? (
             <ExerciseLibrarySection />
           ) : (
-            <Card>
+            <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
               <div className="flex items-start justify-between gap-3">
-                <SectionSubtitle>Exercises in this Workout</SectionSubtitle>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Exercises in this Workout
+                </h2>
                 <button
                   onClick={openAddModal}
                   className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
@@ -438,26 +438,24 @@ export function WorkoutDetailPage() {
               </div>
 
               {isWorkoutExercisesLoading ? (
-                <p className="text-sm text-gray-600 mt-4">
-                  Loading exercises...
-                </p>
+                <p className="text-sm text-gray-600">Loading exercises...</p>
               ) : workoutExercises.length === 0 ? (
-                <p className="text-sm text-gray-600 mt-4">
+                <p className="text-sm text-gray-600">
                   No exercises in this workout yet. Add some from the library!
                 </p>
               ) : (
-                <ul className="space-y-3 mt-4">
+                <ul className="space-y-3">
                   {workoutExercises.map((we) => (
                     <li key={we.id} className="rounded-lg border p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <CardTitle className="text-base">
+                          <p className="font-semibold text-gray-900">
                             {we.exerciseName}
-                          </CardTitle>
-                          <CardDescription>
+                          </p>
+                          <p className="text-sm text-gray-600">
                             {we.sets} sets × {we.reps} reps
                             {we.weight != null && ` @ ${we.weight} kg`}
-                          </CardDescription>
+                          </p>
                           {we.notes && (
                             <p className="text-sm text-gray-700 mt-1">
                               {we.notes}
@@ -473,7 +471,7 @@ export function WorkoutDetailPage() {
                             Edit
                           </button>
                           <button
-                            onClick={() => setWorkoutExerciseToDelete(we)}
+                            onClick={() => handleDeleteWE(we)}
                             className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
                           >
                             Remove
@@ -484,16 +482,18 @@ export function WorkoutDetailPage() {
                   ))}
                 </ul>
               )}
-            </Card>
+            </section>
           )}
         </div>
 
         {/* Desktop: Side-by-Side */}
         <div className="hidden lg:grid lg:grid-cols-2 lg:gap-6">
           {/* Left: Exercises in Workout */}
-          <Card>
+          <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
             <div className="flex items-start justify-between gap-3">
-              <SectionSubtitle>Exercises in this Workout</SectionSubtitle>
+              <h2 className="text-lg font-semibold text-gray-900">
+                Exercises in this Workout
+              </h2>
               <button
                 onClick={openAddModal}
                 className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
@@ -503,24 +503,24 @@ export function WorkoutDetailPage() {
             </div>
 
             {isWorkoutExercisesLoading ? (
-              <p className="text-sm text-gray-600 mt-4">Loading exercises...</p>
+              <p className="text-sm text-gray-600">Loading exercises...</p>
             ) : workoutExercises.length === 0 ? (
-              <p className="text-sm text-gray-600 mt-4">
+              <p className="text-sm text-gray-600">
                 No exercises in this workout yet. Add some from the library!
               </p>
             ) : (
-              <ul className="space-y-3 mt-4">
+              <ul className="space-y-3">
                 {workoutExercises.map((we) => (
                   <li key={we.id} className="rounded-lg border p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
-                        <CardTitle className="text-base">
+                        <p className="font-semibold text-gray-900">
                           {we.exerciseName}
-                        </CardTitle>
-                        <CardDescription>
+                        </p>
+                        <p className="text-sm text-gray-600">
                           {we.sets} sets × {we.reps} reps
                           {we.weight != null && ` @ ${we.weight} kg`}
-                        </CardDescription>
+                        </p>
                         {we.notes && (
                           <p className="text-sm text-gray-700 mt-1">
                             {we.notes}
@@ -536,7 +536,7 @@ export function WorkoutDetailPage() {
                           Edit
                         </button>
                         <button
-                          onClick={() => setWorkoutExerciseToDelete(we)}
+                          onClick={() => handleDeleteWE(we)}
                           className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
                         >
                           Remove
@@ -547,7 +547,7 @@ export function WorkoutDetailPage() {
                 ))}
               </ul>
             )}
-          </Card>
+          </section>
 
           {/* Right: Exercise Library */}
           <ExerciseLibrarySection />
