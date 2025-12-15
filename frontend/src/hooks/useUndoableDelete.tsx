@@ -77,7 +77,7 @@ export function useUndoableDelete<TData = unknown>({
       return optimisticUpdate(old)
     })
 
-    let timeoutId: NodeJS.Timeout | null = null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
     let toastId: Id | null = null
     let isUndone = false
 
