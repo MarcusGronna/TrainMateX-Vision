@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useParams, Link } from '@tanstack/react-router'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '@clerk/clerk-react'
 import type { TrainingProgram } from '@/types/TrainingProgram'
 import type { Workout } from '@/types/Workout'
 import { BackLink } from '@/components/BackLink'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
+import { useApi } from '@/lib/api/useApi'
 
 const PROGRAMS_QUERY_KEY = ['trainingPrograms'] as const
 const WORKOUTS_QUERY_KEY = (programId: string) =>
@@ -13,8 +13,8 @@ const WORKOUTS_QUERY_KEY = (programId: string) =>
 
 export function ProgramDetailPage() {
   const { programId } = useParams({ from: '/programs/$programId' })
-  const { getToken } = useAuth()
   const queryClient = useQueryClient()
+  const api = useApi()
 
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -28,22 +28,7 @@ export function ProgramDetailPage() {
     Error
   >({
     queryKey: [...PROGRAMS_QUERY_KEY, programId],
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Failed to load program (status ${res.status})`)
-      }
-
-      return (await res.json()) as TrainingProgram
-    },
+    queryFn: () => api(`trainingprograms/${programId}`),
   })
 
   // Fetch workouts
@@ -52,48 +37,16 @@ export function ProgramDetailPage() {
     Error
   >({
     queryKey: WORKOUTS_QUERY_KEY(programId),
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Failed to load workouts (status ${res.status})`)
-      }
-
-      return (await res.json()) as Workout[]
-    },
+    queryFn: () => api(`trainingprograms/${programId}/workouts`),
   })
 
   const createMutation = useMutation({
-    mutationFn: async (input: { name: string; description?: string }) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(input),
-        },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Create failed with status ${res.status}`)
-      }
-
-      return (await res.json()) as Workout
-    },
+    mutationFn: async (input: { name: string; description?: string }) =>
+      api(`trainingprograms/${programId}/workouts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: WORKOUTS_QUERY_KEY(programId) })
       setShowCreateModal(false)
@@ -108,28 +61,12 @@ export function ProgramDetailPage() {
       name: string
       description?: string
     }) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
       const { id, ...body } = input
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}workouts/${id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(body),
-        },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Update failed with status ${res.status}`)
-      }
-
-      return (await res.json()) as Workout
+      return api(`trainingprograms/${programId}/workouts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: WORKOUTS_QUERY_KEY(programId) })
@@ -141,23 +78,10 @@ export function ProgramDetailPage() {
   })
 
   const deleteMutation = useMutation<void, Error, string>({
-    mutationFn: async (id) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}workouts/${id}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Delete failed with status ${res.status}`)
-      }
-    },
+    mutationFn: (id) =>
+      api(`trainingprograms/${programId}/workouts/${id}`, {
+        method: 'DELETE',
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: WORKOUTS_QUERY_KEY(programId) })
     },
