@@ -50,7 +50,7 @@ export function ProgramForm({
 
   // Sync form with defaultValues when they change (for edit mode)
   useEffect(() => {
-    if (defaultValues) {
+    if (defaultValues !== undefined) {
       setName(defaultValues.name ?? '')
       setDescription(defaultValues.description ?? '')
       setLevel(defaultValues.level ?? 'beginner')
