@@ -1,100 +1,104 @@
-import type { Exercise } from '@/types/Exercise'
-import { humanizeEnum } from '@/lib/humanizeEnum'
+import { useMemo, useState } from 'react'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
+import type { Exercise } from '@/types/Exercise'
+import { MUSCLE_GROUPS, EQUIPMENT, DIFFICULTIES } from '@/lib/exerciseEnums'
+import { humanizeEnum } from '@/lib/humanizeEnum'
 import { useApi } from '@/lib/api/useApi'
-import { exercisesKeys } from '@/features/exercises/keys'
-import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
-import { SectionTitle } from '@/components/ui/SectionTitle'
-
-import { useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
-import { toast } from 'react-toastify'
 
 export function ExerciseLibraryPage() {
-  const { api } = useApi()
+  const api = useApi()
 
-  const [muscleGroup, setMuscleGroup] = useState<string>('all')
-  const [equipment, setEquipment] = useState<string>('all')
-  const [difficulty, setDifficulty] = useState<string>('all')
-  const [search, setSearch] = useState('')
+  // Filters
+  const [muscleGroupFilter, setMuscleGroupFilter] = useState<string>('all')
+  const [equipmentFilter, setEquipmentFilter] = useState<string>('all')
+  const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
 
-  // Fetch all exercises
-  const {
-    data: exercises = [],
-    isPending,
-    isError,
-    error,
-  } = useQuery<Exercise[], Error>({
-    queryKey: exercisesKeys.list(),
-    queryFn: async () => {
-      const result = await api<Exercise[]>('exercises')
-      return result ?? []
-    },
-  })
-
-  useEffect(() => {
-    if (isError && error) toast.error(error.message)
-  }, [isError, error])
+  // Fetch exercises
+  const { data: exercises, isLoading, error } = api.exercises.useGetAll()
 
   // Filter exercises
   const filteredExercises = useMemo(() => {
-    return exercises.filter((ex) => {
-      const matchesMuscle =
-        muscleGroup === 'all' || ex.muscleGroup === muscleGroup
-      const matchesEquip = equipment === 'all' || ex.equipment === equipment
-      const matchesDiff = difficulty === 'all' || ex.difficulty === difficulty
-      const matchesSearch =
-        !search ||
-        ex.name.toLowerCase().includes(search.toLowerCase()) ||
-        ex.description?.toLowerCase().includes(search.toLowerCase())
+    if (!exercises) return []
 
-      return matchesMuscle && matchesEquip && matchesDiff && matchesSearch
+    return exercises.filter((ex) => {
+      if (muscleGroupFilter !== 'all' && ex.muscleGroup !== muscleGroupFilter)
+        return false
+      if (equipmentFilter !== 'all' && ex.equipment !== equipmentFilter)
+        return false
+      if (difficultyFilter !== 'all' && ex.difficulty !== difficultyFilter)
+        return false
+      return true
     })
-  }, [exercises, muscleGroup, equipment, difficulty, search])
+  }, [exercises, muscleGroupFilter, equipmentFilter, difficultyFilter])
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-600">Loading exercises...</div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          Error loading exercises: {error.message}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="mx-auto max-w-5xl p-4 space-y-6">
-      <SectionTitle description="Browse and filter exercises by muscle group, equipment, and difficulty">
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">
         Exercise Library
-      </SectionTitle>
+      </h1>
 
-      <Card>
+      <div className="mb-6">
         <ExerciseFilters
-          muscleGroup={muscleGroup}
-          setMuscleGroup={setMuscleGroup}
-          equipment={equipment}
-          setEquipment={setEquipment}
-          difficulty={difficulty}
-          setDifficulty={setDifficulty}
-          search={search}
-          setSearch={setSearch}
+          muscleGroup={muscleGroupFilter}
+          equipment={equipmentFilter}
+          difficulty={difficultyFilter}
+          onMuscleGroupChange={setMuscleGroupFilter}
+          onEquipmentChange={setEquipmentFilter}
+          onDifficultyChange={setDifficultyFilter}
+          muscleGroups={MUSCLE_GROUPS}
+          equipmentOptions={EQUIPMENT}
+          difficulties={DIFFICULTIES}
         />
-      </Card>
+      </div>
 
-      {isPending ? (
-        <p className="text-sm text-gray-600">Loading exercises...</p>
-      ) : filteredExercises.length === 0 ? (
-        <Card>
-          <p className="text-center text-gray-600">
-            No exercises match the selected filters.
-          </p>
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredExercises.map((ex) => (
-            <Card key={ex.id} hover>
-              <CardTitle>{ex.name}</CardTitle>
-              <p className="text-xs text-gray-600 mt-1">
-                {humanizeEnum(ex.muscleGroup)} • {humanizeEnum(ex.equipment)} •{' '}
-                {humanizeEnum(ex.difficulty)}
-              </p>
-              {ex.description && (
-                <CardDescription className="mt-2 line-clamp-3">
-                  {ex.description}
-                </CardDescription>
-              )}
-            </Card>
-          ))}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredExercises.map((exercise) => (
+          <div
+            key={exercise.id}
+            className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
+          >
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {exercise.name}
+            </h3>
+            <p className="text-gray-600 text-sm mb-4">{exercise.description}</p>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded">
+                {humanizeEnum(exercise.muscleGroup)}
+              </span>
+              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
+                {humanizeEnum(exercise.equipment)}
+              </span>
+              <span className="px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded">
+                {humanizeEnum(exercise.difficulty)}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredExercises.length === 0 && (
+        <div className="text-center text-gray-600 py-12">
+          No exercises found matching your filters.
         </div>
       )}
     </div>

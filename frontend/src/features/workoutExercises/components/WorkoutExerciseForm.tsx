@@ -1,83 +1,53 @@
-import { type FormEvent, useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { Exercise } from '@/types/Exercise'
-
-interface WorkoutExerciseFormValues {
-  exerciseId: string
-  sets: number
-  reps: number
-  weight?: string
-  notes?: string
-}
+import { humanizeEnum } from '@/lib/humanizeEnum'
 
 interface WorkoutExerciseFormProps {
-  /**
-   * Initial values for the form (used in edit mode)
-   */
-  defaultValues?: Partial<WorkoutExerciseFormValues>
-  /**
-   * Label for the submit button
-   */
-  submitLabel?: string
-  /**
-   * Whether the form is currently submitting
-   */
-  isSubmitting?: boolean
-  /**
-   * Available exercises to choose from (for create mode)
-   */
   exercises?: Exercise[]
-  /**
-   * Whether to show the exercise selector (hidden in edit mode)
-   */
+  preselectedExercise?: Exercise
+  defaultValues?: {
+    exerciseId: string
+    sets: number
+    reps: number
+    weight?: string
+    notes?: string
+  }
+  onSubmit: (values: {
+    exerciseId: string
+    sets: number
+    reps: number
+    weight?: string
+    notes?: string
+  }) => void
+  onCancel: () => void
+  isSubmitting?: boolean
+  submitLabel?: string
   showExerciseSelector?: boolean
-  /**
-   * Callback when form is submitted with valid data
-   */
-  onSubmit: (values: WorkoutExerciseFormValues) => void
-  /**
-   * Callback when form is cancelled
-   */
-  onCancel?: () => void
 }
 
-/**
- * Reusable form for creating or editing workout exercises.
- * Supports both create and edit modes via props.
- */
 export function WorkoutExerciseForm({
-  defaultValues,
-  submitLabel = 'Submit',
-  isSubmitting = false,
   exercises = [],
-  showExerciseSelector = true,
+  preselectedExercise,
+  defaultValues,
   onSubmit,
   onCancel,
+  isSubmitting = false,
+  submitLabel = 'Add Exercise',
+  showExerciseSelector = true,
 }: WorkoutExerciseFormProps) {
-  const [exerciseId, setExerciseId] = useState(defaultValues?.exerciseId ?? '')
+  // Use preselectedExercise.id first, then defaultValues, then empty string
+  const [exerciseId, setExerciseId] = useState(
+    preselectedExercise?.id ?? defaultValues?.exerciseId ?? '',
+  )
   const [sets, setSets] = useState(defaultValues?.sets ?? 3)
   const [reps, setReps] = useState(defaultValues?.reps ?? 10)
   const [weight, setWeight] = useState(defaultValues?.weight ?? '')
   const [notes, setNotes] = useState(defaultValues?.notes ?? '')
 
-  // Sync form with defaultValues when they change (for edit mode)
-  useEffect(() => {
-    if (defaultValues !== undefined) {
-      setExerciseId(defaultValues.exerciseId ?? '')
-      setSets(defaultValues.sets ?? 3)
-      setReps(defaultValues.reps ?? 10)
-      setWeight(defaultValues.weight ?? '')
-      setNotes(defaultValues.notes ?? '')
-    }
-  }, [defaultValues])
-
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (showExerciseSelector && !exerciseId) {
-      return
-    }
-
-    if (sets < 1 || reps < 1) {
+    if (!exerciseId) {
       return
     }
 
@@ -90,139 +60,132 @@ export function WorkoutExerciseForm({
     })
   }
 
-  const selectedExercise = exercises.find((ex) => ex.id === exerciseId)
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      {showExerciseSelector && (
-        <div className="space-y-1">
-          <label
-            htmlFor="exercise-select"
-            className="text-sm font-medium text-gray-700"
-          >
-            Exercise *
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Exercise Selection - Only show if showExerciseSelector is true AND no preselectedExercise */}
+      {showExerciseSelector && !preselectedExercise && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Exercise <span className="text-red-500">*</span>
           </label>
           <select
-            id="exercise-select"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             value={exerciseId}
             onChange={(e) => setExerciseId(e.target.value)}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             required
-            disabled={isSubmitting}
           >
             <option value="">Select an exercise...</option>
-            {exercises.map((exercise) => (
-              <option key={exercise.id} value={exercise.id}>
-                {exercise.name}
+            {exercises.map((ex) => (
+              <option key={ex.id} value={ex.id}>
+                {ex.name} ({humanizeEnum(ex.muscleGroup)})
               </option>
             ))}
           </select>
-          {selectedExercise && (
-            <p className="text-xs text-gray-500 mt-1">
-              {selectedExercise.description}
+        </div>
+      )}
+
+      {/* Show preselected exercise as a nice info card */}
+      {preselectedExercise && (
+        <div className="rounded-lg border-2 border-indigo-100 bg-indigo-50 p-4">
+          <p className="text-xs font-medium text-indigo-600 uppercase tracking-wide mb-1">
+            Selected Exercise
+          </p>
+          <p className="font-semibold text-gray-900 text-lg">
+            {preselectedExercise.name}
+          </p>
+          <div className="flex gap-2 mt-2 flex-wrap">
+            <span className="inline-flex items-center rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-700 border border-gray-200">
+              {humanizeEnum(preselectedExercise.muscleGroup)}
+            </span>
+            <span className="inline-flex items-center rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-700 border border-gray-200">
+              {humanizeEnum(preselectedExercise.equipment)}
+            </span>
+            <span className="inline-flex items-center rounded-md bg-white px-2 py-1 text-xs font-medium text-gray-700 border border-gray-200">
+              {humanizeEnum(preselectedExercise.difficulty)}
+            </span>
+          </div>
+          {preselectedExercise.description && (
+            <p className="text-sm text-gray-600 mt-2">
+              {preselectedExercise.description}
             </p>
           )}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label
-            htmlFor="exercise-sets"
-            className="text-sm font-medium text-gray-700"
-          >
-            Sets *
+      {/* Sets and Reps */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Sets <span className="text-red-500">*</span>
           </label>
           <input
-            id="exercise-sets"
             type="number"
             min="1"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             value={sets}
             onChange={(e) => setSets(Number(e.target.value))}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             required
-            disabled={isSubmitting}
           />
         </div>
-
-        <div className="space-y-1">
-          <label
-            htmlFor="exercise-reps"
-            className="text-sm font-medium text-gray-700"
-          >
-            Reps *
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Reps <span className="text-red-500">*</span>
           </label>
           <input
-            id="exercise-reps"
             type="number"
             min="1"
-            className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             value={reps}
             onChange={(e) => setReps(Number(e.target.value))}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             required
-            disabled={isSubmitting}
           />
         </div>
       </div>
 
-      <div className="space-y-1">
-        <label
-          htmlFor="exercise-weight"
-          className="text-sm font-medium text-gray-700"
-        >
+      {/* Weight */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Weight
         </label>
         <input
-          id="exercise-weight"
           type="text"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
           placeholder="e.g., 50kg or 100lbs"
-          disabled={isSubmitting}
+          className="block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
       </div>
 
-      <div className="space-y-1">
-        <label
-          htmlFor="exercise-notes"
-          className="text-sm font-medium text-gray-700"
-        >
+      {/* Notes */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           Notes
         </label>
         <textarea
-          id="exercise-notes"
-          className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Optional notes"
-          rows={2}
-          disabled={isSubmitting}
+          rows={3}
+          className="block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
         />
       </div>
 
-      <div className="flex gap-3 justify-end pt-2">
-        {onCancel && (
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={isSubmitting}
-            className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Cancel
-          </button>
-        )}
+      {/* Actions */}
+      <div className="flex gap-3 justify-end">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isSubmitting}
+          className="rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+        >
+          Cancel
+        </button>
         <button
           type="submit"
-          disabled={
-            isSubmitting ||
-            (showExerciseSelector && !exerciseId) ||
-            sets < 1 ||
-            reps < 1
-          }
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          disabled={isSubmitting || !exerciseId}
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          {isSubmitting ? 'Saving...' : submitLabel}
+          {isSubmitting ? 'Adding...' : submitLabel}
         </button>
       </div>
     </form>
