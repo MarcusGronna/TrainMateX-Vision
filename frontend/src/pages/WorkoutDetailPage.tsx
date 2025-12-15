@@ -42,23 +42,47 @@ export function WorkoutDetailPage() {
     useState<WorkoutExercise | null>(null)
 
   // ========== FETCH WORKOUT ==========
+  // Fetch workouts and select the specific one
   const {
     data: workout,
     isPending: isWorkoutLoading,
     isError: isWorkoutError,
     error: workoutError,
-  } = useQuery<Workout, Error>({
+  } = useQuery<Workout | undefined, Error>({
     queryKey: workoutsKeys.byId(programId, workoutId),
     queryFn: async () => {
-      const result = await api<Workout>(`workouts/${workoutId}`)
-      if (!result) throw new Error('Workout not found')
-      return result
+      const result = await api<Workout[]>(
+        `trainingprograms/${programId}/workouts`,
+      )
+      if (!result) throw new Error('Failed to fetch workouts')
+
+      const workout = result.find((w) => w.id === workoutId)
+      if (!workout) throw new Error('Workout not found')
+
+      return workout
     },
+    // Optional: Enable stale time to reduce refetches
+    staleTime: 30_000, // 30 seconds
+    retry: 1, // Retry once if workout not found
   })
 
   useEffect(() => {
-    if (isWorkoutError && workoutError) toast.error(workoutError.message)
-  }, [isWorkoutError, workoutError])
+    if (!isWorkoutLoading) {
+      if (isWorkoutError && workoutError) {
+        toast.error(workoutError.message)
+      } else if (!workout) {
+        toast.error('Workout not found')
+        navigate({ to: '/programs/$programId', params: { programId } })
+      }
+    }
+  }, [
+    isWorkoutLoading,
+    isWorkoutError,
+    workout,
+    workoutError,
+    navigate,
+    programId,
+  ])
 
   // ========== FETCH EXERCISES (FOR LIBRARY) ==========
   const {
