@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useState, type FormEvent } from 'react'
 import { toast } from 'react-toastify'
+import { BackLink } from '@/components/BackLink'
 
 const WORKOUT_QUERY_KEY = (programId: string) =>
   ['workouts', programId] as const
@@ -456,12 +457,7 @@ export function ProgramDetailPage() {
           </div>
         </div>
 
-        <Link
-          to="/"
-          className="text-sm text-indigo-600 hover:underline inline-block"
-        >
-          ← Back to programs
-        </Link>
+        <BackLink to="/" />
       </div>
 
       {/* Create Workout Form */}
