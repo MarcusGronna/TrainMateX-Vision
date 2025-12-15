@@ -4,14 +4,16 @@ import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 
 interface BackLinkProps {
   to: string
-  label?: string
+  label: string
+  params?: Record<string, string>
 }
 
-export function BackLink({ to, label = 'Back' }: BackLinkProps) {
+export function BackLink({ to, label, params }: BackLinkProps) {
   return (
     <Link
       to={to as any}
-      className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+      params={params}
+      className="text-sm text-indigo-600 hover:text-indigo-800"
     >
       <FontAwesomeIcon icon={faArrowLeft} size="sm" />
       {label}
