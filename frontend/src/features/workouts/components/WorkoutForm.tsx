@@ -56,7 +56,7 @@ export function WorkoutForm({
 
   // Sync form with defaultValues when they change (for edit mode)
   useEffect(() => {
-    if (defaultValues) {
+    if (defaultValues !== undefined) {
       setName(defaultValues.name ?? '')
       setDayOfWeek(defaultValues.dayOfWeek ?? '')
       setNotes(defaultValues.notes ?? '')
