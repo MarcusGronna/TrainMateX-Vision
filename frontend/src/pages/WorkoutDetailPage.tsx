@@ -428,7 +428,9 @@ export function WorkoutDetailPage() {
           </p>
         ) : (
           <div className="relative">
-            <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-gray-300 via-gray-200 to-transparent pointer-events-none z-10 rounded-t-md" />
+            {exercises.length > 6 && (
+              <div className="absolute top-0 left-0 right-0 h-6 bg-gradient-to-b from-gray-300 via-gray-200 to-transparent pointer-events-none z-10 rounded-t-md" />
+            )}
             <ul className="divide-y rounded-md border max-h-96 overflow-y-auto">
               {exercises.map((ex) => (
                 <li
