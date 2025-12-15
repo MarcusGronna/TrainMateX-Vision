@@ -4,9 +4,10 @@ import type { Exercise } from '@/types/Exercise'
 import { MUSCLE_GROUPS, EQUIPMENT, DIFFICULTIES } from '@/lib/exerciseEnums'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { useApi } from '@/lib/api/useApi'
+import { useQuery } from '@tanstack/react-query'
 
 export function ExerciseLibraryPage() {
-  const api = useApi()
+  const { api } = useApi()
 
   // Filters
   const [muscleGroupFilter, setMuscleGroupFilter] = useState<string>('all')
@@ -14,13 +15,20 @@ export function ExerciseLibraryPage() {
   const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
 
   // Fetch exercises
-  const { data: exercises, isLoading, error } = api.exercises.useGetAll()
+  const {
+    data: exercises,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['exercises'],
+    queryFn: () => api<Exercise[]>('/exercises'),
+  })
 
   // Filter exercises
   const filteredExercises = useMemo(() => {
     if (!exercises) return []
 
-    return exercises.filter((ex) => {
+    return exercises.filter((ex: Exercise) => {
       if (muscleGroupFilter !== 'all' && ex.muscleGroup !== muscleGroupFilter)
         return false
       if (equipmentFilter !== 'all' && ex.equipment !== equipmentFilter)
@@ -72,7 +80,7 @@ export function ExerciseLibraryPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredExercises.map((exercise) => (
+        {filteredExercises.map((exercise: Exercise) => (
           <div
             key={exercise.id}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"

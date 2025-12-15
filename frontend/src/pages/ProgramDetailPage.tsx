@@ -275,7 +275,7 @@ export function ProgramDetailPage() {
 
   // Handlers
   const handleCreateWorkout = (values: CreateWorkoutInput) => {
-    if (!values.name.trim()) {
+    if (!values.name?.trim()) {
       toast.warn('Workout name is required')
       return
     }
@@ -284,7 +284,7 @@ export function ProgramDetailPage() {
   }
 
   const handleEditProgram = (values: UpdateTrainingProgramInput) => {
-    if (!values.name.trim()) {
+    if (!values || !values.name?.trim()) {
       toast.warn('Program name is required')
       return
     }

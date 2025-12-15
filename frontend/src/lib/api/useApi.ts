@@ -1,57 +1,36 @@
 import { useAuth } from '@clerk/clerk-react'
 
-/**
- * Centralized API client that handles:
- * - Clerk authentication (Bearer token)
- * - Error handling and response parsing
- * - 204 No Content handling
- */
 export function useApi() {
   const { getToken } = useAuth()
 
-  /**
-   * Makes an authenticated API request to the backend.
-   * For GET requests that return data, use api<T>().
-   * For DELETE/PUT that return 204, the result will be undefined.
-   */
-  async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const api = async <T>(
+    endpoint: string,
+    options?: RequestInit,
+  ): Promise<T> => {
     const token = await getToken()
-    if (!token) {
-      throw new Error('Missing auth token')
-    }
 
-    const url = `${import.meta.env.VITE_API_BASE_URL}${path}`
+    const baseUrl = (
+      import.meta.env.VITE_API_BASE_URL || 'http://localhost:5125/api/'
+    ).replace(/\/$/, '')
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+    const url = `${baseUrl}${cleanEndpoint}`
+
+    console.log('API Request:', { url, token: token ? 'present' : 'missing' }) // Debug
 
     const response = await fetch(url, {
-      ...init,
       headers: {
-        ...init?.headers,
         Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options?.headers,
       },
+      ...options,
     })
 
-    // Handle errors
     if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(errorText || `Request failed (status ${response.status})`)
+      throw new Error(`API error: ${response.status}`)
     }
 
-    // Handle 204 No Content or empty responses
-    if (
-      response.status === 204 ||
-      response.headers.get('content-length') === '0'
-    ) {
-      return undefined as T
-    }
-
-    // Check if there's actually content to parse
-    const text = await response.text()
-    if (!text) {
-      return undefined as T
-    }
-
-    // Parse JSON response
-    return JSON.parse(text) as T
+    return response.json()
   }
 
   return { api }

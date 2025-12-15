@@ -6,6 +6,7 @@ export type Workout = {
   notes?: string | null
   createdAt: string
   updatedAt: string
+  description: string // Add this line
 }
 
 export type CreateWorkoutInput = {
