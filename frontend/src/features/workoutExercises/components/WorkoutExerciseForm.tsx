@@ -61,7 +61,7 @@ export function WorkoutExerciseForm({
 
   // Sync form with defaultValues when they change (for edit mode)
   useEffect(() => {
-    if (defaultValues) {
+    if (defaultValues !== undefined) {
       setExerciseId(defaultValues.exerciseId ?? '')
       setSets(defaultValues.sets ?? 3)
       setReps(defaultValues.reps ?? 10)
