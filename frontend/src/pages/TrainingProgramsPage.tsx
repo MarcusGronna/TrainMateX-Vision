@@ -4,10 +4,11 @@ import { useApi } from '@/lib/api/useApi'
 import { programsKeys } from '@/features/programs/keys'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ProgramForm } from '@/features/programs/components/ProgramForm'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
 import type { Id } from 'react-toastify'
 
@@ -17,13 +18,6 @@ export function TrainingProgramsPage() {
   const navigate = useNavigate()
 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced'>(
-    'beginner',
-  )
-
-  // Confirm delete state
   const [programToDelete, setProgramToDelete] =
     useState<TrainingProgram | null>(null)
 
@@ -74,10 +68,6 @@ export function TrainingProgramsPage() {
       })
 
       setIsCreateOpen(false)
-      setName('')
-      setDescription('')
-      setLevel('beginner')
-
       navigate({
         to: '/programs/$programId',
         params: { programId: newProgram.id },
@@ -111,11 +101,8 @@ export function TrainingProgramsPage() {
     },
   })
 
-  const handleCreateProgram = (e: FormEvent) => {
-    e.preventDefault()
-
-    const trimmedName = name.trim()
-    if (!trimmedName) {
+  const handleCreateProgram = (values: any) => {
+    if (!values.name.trim()) {
       toast.warn('Program name is required')
       return
     }
@@ -273,55 +260,12 @@ export function TrainingProgramsPage() {
         onClose={() => setIsCreateOpen(false)}
         title="Create Training Program"
       >
-        <form onSubmit={handleCreateProgram} className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Name *</label>
-            <input
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g., 5x5 Strength Program"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
-              Description
-            </label>
-            <textarea
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional description"
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Level</label>
-            <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={level}
-              onChange={(e) =>
-                setLevel(
-                  e.target.value as 'beginner' | 'intermediate' | 'advanced',
-                )
-              }
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-            disabled={createProgramMutation.isPending}
-          >
-            {createProgramMutation.isPending ? 'Creating...' : 'Create Program'}
-          </button>
-        </form>
+        <ProgramForm
+          submitLabel="Create Program"
+          isSubmitting={createProgramMutation.isPending}
+          onSubmit={handleCreateProgram}
+          onCancel={() => setIsCreateOpen(false)}
+        />
       </Modal>
 
       {/* Confirm Delete Dialog */}
