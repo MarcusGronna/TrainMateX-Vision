@@ -6,7 +6,7 @@ interface UseUndoableDeleteOptions<TData> {
   /**
    * Query key for the cache to update
    */
-  queryKey: unknown[]
+  queryKey: readonly unknown[]
   /**
    * Function to execute the actual deletion (after delay)
    */
