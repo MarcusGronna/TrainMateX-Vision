@@ -7,6 +7,7 @@ import type {
 import type { Workout, UpdateWorkoutInput } from '@/types/Workout'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
+import { BackLink } from '@/components/BackLink'
 
 import { useAuth } from '@clerk/clerk-react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
@@ -693,15 +694,7 @@ export function WorkoutDetailPage() {
             Workout:{' '}
             {workout?.name ?? (isWorkoutsLoading ? 'Loading...' : 'Unknown')}
           </h1>
-          <p className="text-sm text-gray-600">
-            <Link
-              to="/programs/$programId"
-              params={{ programId }}
-              className="text-indigo-600 hover:underline"
-            >
-              Back to program
-            </Link>
-          </p>
+          <BackLink to="/programs/$programId" params={{ programId }} />
         </div>
 
         {workout && (
