@@ -1,5 +1,6 @@
 import type { TrainingProgram } from '@/types/TrainingProgram'
 import type { CreateTrainingProgramInput } from '@/types/CreateTrainingProgramInput'
+import type { Workout } from '@/types/Workout'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { useApi } from '@/lib/api/useApi'
 import { programsKeys } from '@/features/programs/keys'
@@ -141,6 +142,22 @@ export function TrainingProgramsPage() {
   const handleDeleteProgram = (program: TrainingProgram) => {
     executeDeleteProgram(program)
   }
+
+  const {
+    data: workout,
+    isPending: isWorkoutLoading,
+    isError: isWorkoutError,
+    error: workoutError,
+  } = useQuery<Workout, Error>({
+    queryKey: workoutsKeys.byId(programId, workoutId),
+    queryFn: async () => {
+      const result = await api<Workout>(
+        `trainingprograms/${programId}/workouts/${workoutId}`,
+      )
+      if (!result) throw new Error('Workout not found')
+      return result
+    },
+  })
 
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
