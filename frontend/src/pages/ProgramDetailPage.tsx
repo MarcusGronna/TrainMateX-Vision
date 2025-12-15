@@ -12,6 +12,8 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ProgramForm } from '@/features/programs/components/ProgramForm'
 import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
+import { Card, CardDescription, CardTitle } from '@/components/ui/Card'
+import { SectionTitle, SectionSubtitle } from '@/components/ui/SectionTitle'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate, Link } from '@tanstack/react-router'
@@ -31,8 +33,7 @@ export function ProgramDetailPage() {
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
 
   // Confirm delete states
-  const [isDeleteProgramDialogOpen, setIsDeleteProgramDialogOpen] =
-    useState(false)
+  const [isDeleteProgramDialogOpen, setIsDeleteProgramDialogOpen] = useState(false)
   const [workoutToDelete, setWorkoutToDelete] = useState<Workout | null>(null)
 
   // Fetch single program
@@ -63,9 +64,7 @@ export function ProgramDetailPage() {
   } = useQuery<Workout[], Error>({
     queryKey: workoutsKeys.list(programId),
     queryFn: async () => {
-      const result = await api<Workout[]>(
-        `trainingprograms/${programId}/workouts`,
-      )
+      const result = await api<Workout[]>(`trainingprograms/${programId}/workouts`)
       return result ?? []
     },
   })
@@ -75,44 +74,42 @@ export function ProgramDetailPage() {
   }, [isWorkoutsError, workoutsError])
 
   // CREATE workout mutation
-  const createWorkoutMutation = useMutation<Workout, Error, CreateWorkoutInput>(
-    {
-      mutationFn: async (input) => {
-        const requestPromise = api<Workout>(
-          `trainingprograms/${programId}/workouts`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(input),
+  const createWorkoutMutation = useMutation<Workout, Error, CreateWorkoutInput>({
+    mutationFn: async (input) => {
+      const requestPromise = api<Workout>(
+        `trainingprograms/${programId}/workouts`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      )
+
+      const result = await toast.promise(requestPromise, {
+        pending: 'Creating workout...',
+        success: 'Workout created',
+        error: {
+          render({ data }) {
+            const e = data as Error | undefined
+            return e?.message ?? 'Failed to create workout'
           },
-        )
+        },
+      })
 
-        const result = await toast.promise(requestPromise, {
-          pending: 'Creating workout...',
-          success: 'Workout created',
-          error: {
-            render({ data }) {
-              const e = data as Error | undefined
-              return e?.message ?? 'Failed to create workout'
-            },
-          },
-        })
+      if (!result) throw new Error('Failed to create workout')
+      return result
+    },
+    onSuccess: async (newWorkout) => {
+      await queryClient.invalidateQueries({
+        queryKey: workoutsKeys.list(programId),
+      })
 
-        if (!result) throw new Error('Failed to create workout')
-        return result
-      },
-      onSuccess: async (newWorkout) => {
-        await queryClient.invalidateQueries({
-          queryKey: workoutsKeys.list(programId),
-        })
+      setIsCreateWorkoutOpen(false)
 
-        setIsCreateWorkoutOpen(false)
-
-        navigate({
-          to: '/programs/$programId/workouts/$workoutId',
-          params: { programId, workoutId: newWorkout.id },
-        })
-      },
+      navigate({
+        to: '/programs/$programId/workouts/$workoutId',
+        params: { programId, workoutId: newWorkout.id },
+      })
     },
   )
 
@@ -181,7 +178,7 @@ export function ProgramDetailPage() {
         queryKey: programsKeys.list(),
       })
       setIsDeleteProgramDialogOpen(false)
-      navigate({ to: '/' })
+      navigate({ to: '/programs' })
     },
   })
 
@@ -315,38 +312,38 @@ export function ProgramDetailPage() {
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
       {/* Header with Edit/Delete Program buttons */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-gray-900">
-            {program?.name ?? (isProgramLoading ? 'Loading...' : 'Unknown')}
-          </h1>
-          {program?.description && (
-            <p className="text-sm text-gray-600">{program.description}</p>
-          )}
-          {program && (
-            <p className="text-xs text-gray-500">
-              Level: {humanizeEnum(program.level)}
-            </p>
-          )}
-          <BackLink to="/" label="Back to Programs" />
-        </div>
-
+      <div className="space-y-4">
+        <SectionTitle
+          description={program?.description ?? undefined}
+          action={
+            program && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsEditProgramOpen(true)}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => setIsDeleteProgramDialogOpen(true)}
+                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            )
+          }
+        >
+          {program?.name ?? (isProgramLoading ? 'Loading...' : 'Unknown')}
+        </SectionTitle>
+        
         {program && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsEditProgramOpen(true)}
-              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => setIsDeleteProgramDialogOpen(true)}
-              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-            >
-              Delete
-            </button>
-          </div>
+          <p className="text-xs text-gray-500">
+            Level: {humanizeEnum(program.level)}
+          </p>
         )}
+        
+        <BackLink to="/programs" label="Back to Programs" />
       </div>
 
       {/* Add Workout Button */}
@@ -360,17 +357,17 @@ export function ProgramDetailPage() {
       </div>
 
       {/* Workouts List */}
-      <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Workouts</h2>
+      <Card>
+        <SectionSubtitle>Workouts</SectionSubtitle>
 
         {isWorkoutsLoading ? (
-          <p className="text-sm text-gray-600">Loading workouts...</p>
+          <p className="text-sm text-gray-600 mt-4">Loading workouts...</p>
         ) : workouts.length === 0 ? (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 mt-4">
             No workouts yet. Add your first one!
           </p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 mt-4">
             {workouts.map((workout) => (
               <li key={workout.id} className="rounded-lg border p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -379,22 +376,15 @@ export function ProgramDetailPage() {
                     params={{ programId, workoutId: workout.id }}
                     className="flex-1 min-w-0 hover:bg-gray-50 transition-colors rounded-md p-2 -m-2"
                   >
-                    <p className="font-semibold text-gray-900">
-                      {workout.name}
-                    </p>
+                    <CardTitle className="text-base">{workout.name}</CardTitle>
                     {workout.dayOfWeek && (
-                      <p className="text-sm text-gray-600">
-                        {workout.dayOfWeek}
-                      </p>
+                      <CardDescription>{workout.dayOfWeek}</CardDescription>
                     )}
                     {workout.notes && (
-                      <p className="text-sm text-gray-700 mt-1">
-                        {workout.notes}
-                      </p>
+                      <p className="text-sm text-gray-700 mt-1">{workout.notes}</p>
                     )}
                     <p className="text-xs text-gray-400 mt-2">
-                      Created:{' '}
-                      {new Date(workout.createdAt).toLocaleDateString()}
+                      Created: {new Date(workout.createdAt).toLocaleDateString()}
                     </p>
                   </Link>
 
@@ -423,7 +413,7 @@ export function ProgramDetailPage() {
             ))}
           </ul>
         )}
-      </section>
+      </Card>
 
       {/* Create Workout Modal */}
       <Modal
@@ -451,12 +441,7 @@ export function ProgramDetailPage() {
               ? {
                   name: program.name,
                   description: program.description ?? undefined,
-                  level:
-                    (program.level as
-                      | 'beginner'
-                      | 'intermediate'
-                      | 'advanced'
-                      | undefined) ?? undefined,
+                  level: program.level,
                 }
               : undefined
           }
@@ -506,9 +491,7 @@ export function ProgramDetailPage() {
       <ConfirmDialog
         isOpen={!!workoutToDelete}
         onClose={() => setWorkoutToDelete(null)}
-        onConfirm={() =>
-          workoutToDelete && handleDeleteWorkout(workoutToDelete)
-        }
+        onConfirm={() => workoutToDelete && handleDeleteWorkout(workoutToDelete)}
         title="Delete Workout"
         description={`Are you sure you want to delete workout "${workoutToDelete?.name}"? This action cannot be undone.`}
         confirmText="Delete"
