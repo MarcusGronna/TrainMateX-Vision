@@ -5,12 +5,12 @@ import { programsKeys } from '@/features/programs/keys'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ProgramForm } from '@/features/programs/components/ProgramForm'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
-import type { Id } from 'react-toastify'
 
 export function TrainingProgramsPage() {
   const { api } = useApi()
@@ -75,7 +75,7 @@ export function TrainingProgramsPage() {
     },
   })
 
-  // DELETE program mutation (with optimistic undo)
+  // DELETE program mutation
   const deleteProgramMutation = useMutation<void, Error, string>({
     mutationFn: async (programId) => {
       const requestPromise = api(`trainingprograms/${programId}`, {
@@ -109,63 +109,14 @@ export function TrainingProgramsPage() {
   }
 
   const handleDeleteProgram = (program: TrainingProgram) => {
-    // Store previous data for rollback
-    const previousPrograms = queryClient.getQueryData<TrainingProgram[]>(
-      programsKeys.list(),
-    )
+    const executeDelete = useUndoableDelete<TrainingProgram[]>({
+      queryKey: programsKeys.list(),
+      deleteFn: () => deleteProgramMutation.mutateAsync(program.id),
+      optimisticUpdate: (old) => old?.filter((p) => p.id !== program.id) ?? [],
+      itemLabel: program.name,
+    })
 
-    // Optimistically remove from cache
-    queryClient.setQueryData<TrainingProgram[]>(
-      programsKeys.list(),
-      (old) => old?.filter((p) => p.id !== program.id) ?? [],
-    )
-
-    let timeoutId: NodeJS.Timeout | null = null
-    let toastId: Id | null = null
-    let isUndone = false
-
-    // Show undo toast
-    toastId = toast.info(
-      <div className="flex items-center justify-between gap-4 text-sm">
-        <span className="text-gray-700">
-          Deleted <strong>{program.name}</strong>
-        </span>
-        <button
-          onClick={() => {
-            isUndone = true
-            if (timeoutId) clearTimeout(timeoutId)
-            if (toastId) toast.dismiss(toastId)
-
-            // Rollback optimistic update
-            queryClient.setQueryData(programsKeys.list(), previousPrograms)
-
-            toast.success('Undo successful')
-          }}
-          className="shrink-0 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors"
-        >
-          Undo
-        </button>
-      </div>,
-      {
-        autoClose: 5000,
-        closeButton: false,
-        onClose: () => {
-          if (timeoutId) clearTimeout(timeoutId)
-        },
-      },
-    )
-
-    // Execute actual deletion after delay
-    timeoutId = setTimeout(() => {
-      if (!isUndone) {
-        deleteProgramMutation.mutate(program.id, {
-          onError: () => {
-            // Rollback on error
-            queryClient.setQueryData(programsKeys.list(), previousPrograms)
-          },
-        })
-      }
-    }, 5000)
+    executeDelete()
   }
 
   return (
