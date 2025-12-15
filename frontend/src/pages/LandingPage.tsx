@@ -1,5 +1,4 @@
 import { SignInButton } from '@clerk/clerk-react'
-import { Link } from '@tanstack/react-router'
 
 export function LandingPage() {
   return (
@@ -28,19 +27,13 @@ export function LandingPage() {
             </p>
           </div>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
+          {/* CTA Button */}
+          <div className="flex items-center justify-center pt-8">
             <SignInButton mode="modal">
-              <button className="w-full sm:w-auto rounded-lg bg-indigo-600 px-8 py-4 text-lg font-semibold text-white shadow-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors">
+              <button className="w-full sm:w-auto rounded-lg bg-indigo-600 px-8 py-4 text-lg font-semibold text-white shadow-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                 Get Started
               </button>
             </SignInButton>
-            <Link
-              to="/exercises"
-              className="w-full sm:w-auto rounded-lg border-2 border-gray-300 bg-white px-8 py-4 text-lg font-semibold text-gray-700 hover:border-gray-400 hover:bg-gray-50 active:bg-gray-100 transition-colors"
-            >
-              Browse Exercises
-            </Link>
           </div>
         </div>
 
@@ -132,7 +125,7 @@ export function LandingPage() {
               Join TrainMateX-Vision and take your fitness to the next level.
             </p>
             <SignInButton mode="modal">
-              <button className="rounded-lg bg-indigo-600 px-8 py-3 text-lg font-semibold text-white shadow-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors">
+              <button className="rounded-lg bg-indigo-600 px-8 py-3 text-lg font-semibold text-white shadow-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
                 Sign In Now
               </button>
             </SignInButton>
