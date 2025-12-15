@@ -1,67 +1,53 @@
-import type { TrainingProgram } from '@/types/TrainingProgram'
-import type { Workout } from '@/types/Workout'
-import type { UpdateTrainingProgramInput } from '@/types/CreateTrainingProgramInput'
-import type { CreateWorkoutInput } from '@/types/Workout'
-import { useAuth } from '@clerk/clerk-react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
-import { useEffect, useState, type FormEvent } from 'react'
-import { toast } from 'react-toastify'
+import type {
+  TrainingProgram,
+  UpdateTrainingProgramInput,
+} from '@/types/TrainingProgram'
+import type { Workout, CreateWorkoutInput } from '@/types/Workout'
+import { humanizeEnum } from '@/lib/humanizeEnum'
+import { useApi } from '@/lib/api/useApi'
+import { programsKeys } from '@/features/programs/keys'
+import { workoutsKeys } from '@/features/workouts/keys'
 import { BackLink } from '@/components/BackLink'
+import { Modal } from '@/components/ui/Modal'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ProgramForm } from '@/features/programs/components/ProgramForm'
+import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 
-const WORKOUT_QUERY_KEY = (programId: string) =>
-  ['workouts', programId] as const
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { toast } from 'react-toastify'
 
 export function ProgramDetailPage() {
-  const { programId } = useParams({ from: '/programs/$programId/' })
-  const { getToken } = useAuth()
+  const { programId } = useParams({ from: '/programs/$programId' })
+  const { api } = useApi()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
-  // Edit program modal state
+  // Modal states
   const [isEditProgramOpen, setIsEditProgramOpen] = useState(false)
-  const [editProgramName, setEditProgramName] = useState('')
-  const [editProgramDescription, setEditProgramDescription] = useState('')
-  const [editProgramLevel, setEditProgramLevel] = useState<
-    'beginner' | 'intermediate' | 'advanced'
-  >('beginner')
-
-  // Create workout state
-  const [workoutName, setWorkoutName] = useState('')
-  const [dayOfWeek, setDayOfWeek] = useState('')
-  const [notes, setNotes] = useState('')
-
-  // Edit workout modal state
+  const [isCreateWorkoutOpen, setIsCreateWorkoutOpen] = useState(false)
   const [isEditWorkoutOpen, setIsEditWorkoutOpen] = useState(false)
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
-  const [editWorkoutName, setEditWorkoutName] = useState('')
-  const [editDayOfWeek, setEditDayOfWeek] = useState('')
-  const [editNotes, setEditNotes] = useState('')
 
+  // Confirm delete states
+  const [isDeleteProgramDialogOpen, setIsDeleteProgramDialogOpen] =
+    useState(false)
+  const [workoutToDelete, setWorkoutToDelete] = useState<Workout | null>(null)
+
+  // Fetch single program
   const {
     data: program,
     isPending: isProgramLoading,
     isError: isProgramError,
     error: programError,
   } = useQuery<TrainingProgram, Error>({
-    queryKey: ['trainingprogram', programId],
+    queryKey: programsKeys.byId(programId),
     queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Failed to load program (status ${res.status})`)
-      }
-
-      return (await res.json()) as TrainingProgram
+      const result = await api<TrainingProgram>(`trainingprograms/${programId}`)
+      if (!result) throw new Error('Program not found')
+      return result
     },
   })
 
@@ -69,28 +55,19 @@ export function ProgramDetailPage() {
     if (isProgramError && programError) toast.error(programError.message)
   }, [isProgramError, programError])
 
+  // Fetch workouts for this program
   const {
     data: workouts = [],
     isPending: isWorkoutsLoading,
     isError: isWorkoutsError,
     error: workoutsError,
   } = useQuery<Workout[], Error>({
-    queryKey: WORKOUT_QUERY_KEY(programId),
+    queryKey: workoutsKeys.list(programId),
     queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const result = await api<Workout[]>(
+        `trainingprograms/${programId}/workouts`,
       )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Failed to load workouts (status ${res.status})`)
-      }
-
-      return (await res.json()) as Workout[]
+      return result ?? []
     },
   })
 
@@ -98,89 +75,65 @@ export function ProgramDetailPage() {
     if (isWorkoutsError && workoutsError) toast.error(workoutsError.message)
   }, [isWorkoutsError, workoutsError])
 
-  const createWorkoutMutation = useMutation<
-    Workout,
-    Error,
-    { name: string; dayOfWeek?: string; notes?: string }
-  >({
-    mutationFn: async (input) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts`,
+  // CREATE workout mutation
+  const createWorkoutMutation = useMutation<Workout, Error, CreateWorkoutInput>(
+    {
+      mutationFn: async (input) => {
+        const requestPromise = api<Workout>(
+          `trainingprograms/${programId}/workouts`,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(input),
           },
         )
 
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Create failed with status ${res.status}`)
-        }
-
-        return (await res.json()) as Workout
-      })()
-
-      return await toast.promise(requestPromise, {
-        pending: 'Creating workout...',
-        success: 'Workout created',
-        error: {
-          render({ data }) {
-            const e = data as Error | undefined
-            return e?.message ?? 'Failed to create workout'
+        const result = await toast.promise(requestPromise, {
+          pending: 'Creating workout...',
+          success: 'Workout created',
+          error: {
+            render({ data }) {
+              const e = data as Error | undefined
+              return e?.message ?? 'Failed to create workout'
+            },
           },
-        },
-      })
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: WORKOUT_QUERY_KEY(programId),
-      })
+        })
 
-      setWorkoutName('')
-      setDayOfWeek('')
-      setNotes('')
-    },
-  })
+        if (!result) throw new Error('Failed to create workout')
+        return result
+      },
+      onSuccess: async (newWorkout) => {
+        await queryClient.invalidateQueries({
+          queryKey: workoutsKeys.list(programId),
+        })
 
+        setIsCreateWorkoutOpen(false)
+
+        navigate({
+          to: '/programs/$programId/workouts/$workoutId',
+          params: { programId, workoutId: newWorkout.id },
+        })
+      },
+    },
+  )
+
+  // UPDATE program mutation
   const updateProgramMutation = useMutation<
     TrainingProgram,
     Error,
     UpdateTrainingProgramInput
   >({
     mutationFn: async (input) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
+      const requestPromise = api<TrainingProgram>(
+        `trainingprograms/${programId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      )
 
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
-          },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Update failed with status ${res.status}`)
-        }
-
-        return (await res.json()) as TrainingProgram
-      })()
-
-      return await toast.promise(requestPromise, {
+      const result = await toast.promise(requestPromise, {
         pending: 'Updating program...',
         success: 'Program updated',
         error: {
@@ -190,40 +143,30 @@ export function ProgramDetailPage() {
           },
         },
       })
+
+      if (!result) throw new Error('Failed to update program')
+      return result
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ['trainingprograms'],
+        queryKey: programsKeys.list(),
       })
       await queryClient.invalidateQueries({
-        queryKey: ['trainingprogram', programId],
+        queryKey: programsKeys.byId(programId),
       })
 
       setIsEditProgramOpen(false)
     },
   })
 
+  // DELETE program mutation
   const deleteProgramMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
+      const requestPromise = api(`trainingprograms/${programId}`, {
+        method: 'DELETE',
+      })
 
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}`,
-          {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Delete failed with status ${res.status}`)
-        }
-      })()
-
-      return await toast.promise(requestPromise, {
+      await toast.promise(requestPromise, {
         pending: 'Deleting program...',
         success: 'Program deleted',
         error: {
@@ -236,44 +179,30 @@ export function ProgramDetailPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: ['trainingprograms'],
+        queryKey: programsKeys.list(),
       })
-
+      setIsDeleteProgramDialogOpen(false)
       navigate({ to: '/' })
     },
   })
 
+  // UPDATE workout mutation
   const updateWorkoutMutation = useMutation<
     Workout,
     Error,
     { workoutId: string; input: CreateWorkoutInput }
   >({
     mutationFn: async ({ workoutId, input }) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
+      const requestPromise = api<Workout>(
+        `trainingprograms/${programId}/workouts/${workoutId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      )
 
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts/${workoutId}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
-          },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Update failed with status ${res.status}`)
-        }
-
-        return (await res.json()) as Workout
-      })()
-
-      return await toast.promise(requestPromise, {
+      const result = await toast.promise(requestPromise, {
         pending: 'Updating workout...',
         success: 'Workout updated',
         error: {
@@ -283,10 +212,13 @@ export function ProgramDetailPage() {
           },
         },
       })
+
+      if (!result) throw new Error('Failed to update workout')
+      return result
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: WORKOUT_QUERY_KEY(programId),
+        queryKey: workoutsKeys.list(programId),
       })
 
       setIsEditWorkoutOpen(false)
@@ -294,27 +226,15 @@ export function ProgramDetailPage() {
     },
   })
 
+  // DELETE workout mutation
   const deleteWorkoutMutation = useMutation<void, Error, string>({
     mutationFn: async (workoutId) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
+      const requestPromise = api(
+        `trainingprograms/${programId}/workouts/${workoutId}`,
+        { method: 'DELETE' },
+      )
 
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts/${workoutId}`,
-          {
-            method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Delete failed with status ${res.status}`)
-        }
-      })()
-
-      return await toast.promise(requestPromise, {
+      await toast.promise(requestPromise, {
         pending: 'Deleting workout...',
         success: 'Workout deleted',
         error: {
@@ -327,414 +247,282 @@ export function ProgramDetailPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: WORKOUT_QUERY_KEY(programId),
+        queryKey: workoutsKeys.list(programId),
       })
+      setWorkoutToDelete(null)
     },
   })
 
-  const handleCreateWorkout = (e: FormEvent) => {
-    e.preventDefault()
+  // DELETE program with optimistic undo - hook called at top level
+  const executeDeleteProgram = useUndoableDelete<
+    TrainingProgram[],
+    TrainingProgram
+  >({
+    queryKey: programsKeys.list(),
+    deleteFn: () => deleteProgramMutation.mutateAsync(),
+    optimisticUpdate: (old) => old?.filter((p) => p.id !== programId) ?? [],
+    getItemLabel: () => program?.name || 'program',
+  })
 
-    if (!workoutName.trim()) {
+  // DELETE workout with optimistic undo - hook called at top level
+  const executeDeleteWorkout = useUndoableDelete<Workout[], Workout>({
+    queryKey: workoutsKeys.list(programId),
+    deleteFn: (workout) => deleteWorkoutMutation.mutateAsync(workout.id),
+    optimisticUpdate: (old, workout) =>
+      old?.filter((w) => w.id !== workout.id) ?? [],
+    getItemLabel: (workout) => workout.name,
+  })
+
+  // Handlers
+  const handleCreateWorkout = (values: CreateWorkoutInput) => {
+    if (!values.name?.trim()) {
       toast.warn('Workout name is required')
       return
     }
 
-    createWorkoutMutation.mutate({
-      name: workoutName.trim(),
-      dayOfWeek: dayOfWeek.trim() || undefined,
-      notes: notes.trim() || undefined,
-    })
+    createWorkoutMutation.mutate(values)
   }
 
-  const handleEditProgram = (e: FormEvent) => {
-    e.preventDefault()
-
-    if (!editProgramName.trim()) {
+  const handleEditProgram = (values: UpdateTrainingProgramInput) => {
+    if (!values || !values.name?.trim()) {
       toast.warn('Program name is required')
       return
     }
 
-    updateProgramMutation.mutate({
-      name: editProgramName.trim(),
-      description: editProgramDescription.trim() || undefined,
-      level: editProgramLevel,
-    })
+    updateProgramMutation.mutate(values)
   }
 
   const handleDeleteProgram = () => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${program?.name}"? This will also delete all workouts.`,
-      )
-    ) {
-      deleteProgramMutation.mutate()
+    if (program) {
+      executeDeleteProgram(program)
     }
   }
 
-  const openEditProgramModal = () => {
-    if (!program) return
-    setEditProgramName(program.name)
-    setEditProgramDescription(program.description || '')
-    setEditProgramLevel(
-      (program.level || 'beginner') as 'beginner' | 'intermediate' | 'advanced',
-    )
-    setIsEditProgramOpen(true)
-  }
-
-  const handleEditWorkout = (e: FormEvent) => {
-    e.preventDefault()
-
+  const handleEditWorkout = (values: CreateWorkoutInput) => {
     if (!editingWorkout) return
 
-    if (!editWorkoutName.trim()) {
+    if (!values.name.trim()) {
       toast.warn('Workout name is required')
       return
     }
 
     updateWorkoutMutation.mutate({
       workoutId: editingWorkout.id,
-      input: {
-        name: editWorkoutName.trim(),
-        dayOfWeek: editDayOfWeek.trim() || undefined,
-        notes: editNotes.trim() || undefined,
-      },
+      input: values,
     })
   }
 
   const handleDeleteWorkout = (workout: Workout) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete workout "${workout.name}"?`,
-      )
-    ) {
-      deleteWorkoutMutation.mutate(workout.id)
-    }
+    executeDeleteWorkout(workout)
   }
 
   const openEditWorkoutModal = (workout: Workout) => {
     setEditingWorkout(workout)
-    setEditWorkoutName(workout.name)
-    setEditDayOfWeek(workout.dayOfWeek || '')
-    setEditNotes(workout.notes || '')
     setIsEditWorkoutOpen(true)
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-4 space-y-6">
-      {/* Header */}
-      <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              {program?.name ?? (isProgramLoading ? 'Loading...' : 'Unknown')}
-            </h1>
-            {program?.description && (
-              <p className="text-sm text-gray-700 mt-1">
-                {program.description}
-              </p>
-            )}
-            {program?.level && (
-              <p className="text-sm text-gray-600 mt-1">
-                Level: {program.level}
-              </p>
-            )}
-          </div>
+    <div className="mx-auto max-w-5xl p-4 space-y-6">
+      {/* Header with Edit/Delete Program buttons */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-gray-900">
+            {program?.name ?? (isProgramLoading ? 'Loading...' : 'Unknown')}
+          </h1>
+          {program?.description && (
+            <p className="text-sm text-gray-600">{program.description}</p>
+          )}
+          {program && (
+            <p className="text-xs text-gray-500">
+              Level: {humanizeEnum(program.level)}
+            </p>
+          )}
+          {/* This is correct, don't touch */}
+          <BackLink to="/" label="Back to Programs" />
+        </div>
 
-          <div className="flex gap-2 shrink-0">
+        {program && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={openEditProgramModal}
-              className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition"
+              onClick={() => setIsEditProgramOpen(true)}
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               Edit
             </button>
             <button
-              onClick={handleDeleteProgram}
-              className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition"
+              onClick={() => setIsDeleteProgramDialogOpen(true)}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
               Delete
             </button>
           </div>
-        </div>
-
-        <BackLink to="/" />
+        )}
       </div>
 
-      {/* Create Workout Form */}
-      <form
-        onSubmit={handleCreateWorkout}
-        className="space-y-4 rounded-xl border bg-white p-4 shadow-sm"
-      >
-        <h2 className="text-lg font-semibold text-gray-900">Create workout</h2>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">Name</label>
-          <input
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
-            value={workoutName}
-            onChange={(e) => setWorkoutName(e.target.value)}
-            placeholder="Leg Day, Push, Pull..."
-          />
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">
-            Day of week (optional)
-          </label>
-          <select
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
-            value={dayOfWeek}
-            onChange={(e) => setDayOfWeek(e.target.value)}
-          >
-            <option value="">Select a day...</option>
-            <option value="Monday">Monday</option>
-            <option value="Tuesday">Tuesday</option>
-            <option value="Wednesday">Wednesday</option>
-            <option value="Thursday">Thursday</option>
-            <option value="Friday">Friday</option>
-            <option value="Saturday">Saturday</option>
-            <option value="Sunday">Sunday</option>
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-sm font-medium text-gray-700">
-            Notes (optional)
-          </label>
-          <textarea
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Short notes about the workout..."
-          />
-        </div>
-
+      {/* Add Workout Button */}
+      <div className="flex justify-end">
         <button
-          type="submit"
-          className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-          disabled={createWorkoutMutation.isPending}
+          onClick={() => setIsCreateWorkoutOpen(true)}
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
-          {createWorkoutMutation.isPending ? 'Creating...' : 'Create Workout'}
+          Add Workout
         </button>
-      </form>
+      </div>
 
       {/* Workouts List */}
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Workouts in this program
-        </h2>
+      <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900">Workouts</h2>
 
         {isWorkoutsLoading ? (
-          <p className="text-gray-600">Loading workouts...</p>
-        ) : isWorkoutsError ? (
-          <p className="text-gray-600">Could not load workouts.</p>
+          <p className="text-sm text-gray-600">Loading workouts...</p>
         ) : workouts.length === 0 ? (
-          <p className="text-gray-600">
-            No workouts yet. Create one to get started.
+          <p className="text-sm text-gray-600">
+            No workouts yet. Add your first one!
           </p>
         ) : (
-          <ul className="space-y-3">
-            {workouts.map((w) => (
-              <li
-                key={w.id}
-                className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    to="/programs/$programId/workouts/$workoutId"
-                    params={{ programId, workoutId: w.id }}
-                    className="flex-1 min-w-0"
-                  >
-                    <p className="font-semibold text-gray-900">{w.name}</p>
-                    {w.dayOfWeek && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        {w.dayOfWeek}
+          <ul className="divide-y rounded-md border">
+            {workouts.map((workout) => (
+              <li key={workout.id}>
+                <Link
+                  to="/programs/$programId/workouts/$workoutId"
+                  params={{ programId, workoutId: workout.id }}
+                  className="block p-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">
+                        {workout.name}
                       </p>
-                    )}
-                    {w.notes && (
-                      <p className="text-sm text-gray-700 mt-1">{w.notes}</p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-2">
-                      Created: {new Date(w.createdAt).toLocaleDateString()}
-                    </p>
-                  </Link>
+                      {workout.dayOfWeek && (
+                        <p className="text-sm text-gray-600">
+                          {workout.dayOfWeek}
+                        </p>
+                      )}
+                      {workout.notes && (
+                        <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                          {workout.notes}
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="flex flex-col gap-2 shrink-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openEditWorkoutModal(w)
-                      }}
-                      className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 transition"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteWorkout(w)
-                      }}
-                      className="px-3 py-1 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 transition"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          openEditWorkoutModal(workout)
+                        }}
+                        className="text-xs rounded-md bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDeleteWorkout(workout)
+                        }}
+                        className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </Link>
               </li>
             ))}
           </ul>
         )}
-      </div>
+      </section>
+
+      {/* Create Workout Modal */}
+      <Modal
+        isOpen={isCreateWorkoutOpen}
+        onClose={() => setIsCreateWorkoutOpen(false)}
+        title="Add Workout"
+      >
+        <WorkoutForm
+          submitLabel="Create Workout"
+          isSubmitting={createWorkoutMutation.isPending}
+          onSubmit={handleCreateWorkout}
+          onCancel={() => setIsCreateWorkoutOpen(false)}
+        />
+      </Modal>
 
       {/* Edit Program Modal */}
-      {isEditProgramOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Edit Program
-              </h3>
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                onClick={() => setIsEditProgramOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleEditProgram} className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editProgramName}
-                  onChange={(e) => setEditProgramName(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Description
-                </label>
-                <textarea
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editProgramDescription}
-                  onChange={(e) => setEditProgramDescription(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Level
-                </label>
-                <select
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editProgramLevel}
-                  onChange={(e) =>
-                    setEditProgramLevel(
-                      e.target.value as
-                        | 'beginner'
-                        | 'intermediate'
-                        | 'advanced',
-                    )
-                  }
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-                disabled={updateProgramMutation.isPending}
-              >
-                {updateProgramMutation.isPending
-                  ? 'Updating...'
-                  : 'Update Program'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={isEditProgramOpen}
+        onClose={() => setIsEditProgramOpen(false)}
+        title="Edit Program"
+      >
+        <ProgramForm
+          defaultValues={
+            program
+              ? {
+                  name: program.name,
+                  description: program.description ?? undefined,
+                  level: (program.level ?? 'beginner') as
+                    | 'beginner'
+                    | 'intermediate'
+                    | 'advanced',
+                }
+              : undefined
+          }
+          submitLabel="Update Program"
+          isSubmitting={updateProgramMutation.isPending}
+          onSubmit={handleEditProgram}
+          onCancel={() => setIsEditProgramOpen(false)}
+        />
+      </Modal>
 
       {/* Edit Workout Modal */}
-      {isEditWorkoutOpen && editingWorkout && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Edit Workout
-              </h3>
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                onClick={() => setIsEditWorkoutOpen(false)}
-              >
-                Close
-              </button>
-            </div>
+      <Modal
+        isOpen={isEditWorkoutOpen}
+        onClose={() => setIsEditWorkoutOpen(false)}
+        title="Edit Workout"
+      >
+        <WorkoutForm
+          defaultValues={
+            editingWorkout
+              ? {
+                  name: editingWorkout.name,
+                  dayOfWeek: editingWorkout.dayOfWeek ?? undefined,
+                  notes: editingWorkout.notes ?? undefined,
+                }
+              : undefined
+          }
+          submitLabel="Update Workout"
+          isSubmitting={updateWorkoutMutation.isPending}
+          onSubmit={handleEditWorkout}
+          onCancel={() => setIsEditWorkoutOpen(false)}
+        />
+      </Modal>
 
-            <form onSubmit={handleEditWorkout} className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editWorkoutName}
-                  onChange={(e) => setEditWorkoutName(e.target.value)}
-                />
-              </div>
+      {/* Confirm Delete Program Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteProgramDialogOpen}
+        onClose={() => setIsDeleteProgramDialogOpen(false)}
+        onConfirm={handleDeleteProgram}
+        title="Delete Program"
+        description={`Are you sure you want to delete "${program?.name}"? This will also delete all workouts. This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Day of week
-                </label>
-                <select
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editDayOfWeek}
-                  onChange={(e) => setEditDayOfWeek(e.target.value)}
-                >
-                  <option value="">Select a day...</option>
-                  <option value="Monday">Monday</option>
-                  <option value="Tuesday">Tuesday</option>
-                  <option value="Wednesday">Wednesday</option>
-                  <option value="Thursday">Thursday</option>
-                  <option value="Friday">Friday</option>
-                  <option value="Saturday">Saturday</option>
-                  <option value="Sunday">Sunday</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Notes
-                </label>
-                <textarea
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editNotes}
-                  onChange={(e) => setEditNotes(e.target.value)}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-                disabled={updateWorkoutMutation.isPending}
-              >
-                {updateWorkoutMutation.isPending
-                  ? 'Updating...'
-                  : 'Update Workout'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Confirm Delete Workout Dialog */}
+      <ConfirmDialog
+        isOpen={!!workoutToDelete}
+        onClose={() => setWorkoutToDelete(null)}
+        onConfirm={() =>
+          workoutToDelete && handleDeleteWorkout(workoutToDelete)
+        }
+        title="Delete Workout"
+        description={`Are you sure you want to delete workout "${workoutToDelete?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
     </div>
   )
 }
