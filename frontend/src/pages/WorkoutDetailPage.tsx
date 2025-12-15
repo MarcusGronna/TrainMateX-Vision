@@ -9,17 +9,19 @@ import { humanizeEnum } from '@/lib/humanizeEnum'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
 import { BackLink } from '@/components/BackLink'
 import { useApi } from '@/lib/api/useApi'
+import { workoutsKeys } from '@/features/workouts/keys'
+import { exercisesKeys } from '@/features/exercises/keys'
+import { workoutExercisesKeys } from '@/features/workoutExercises/keys'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Modal } from '@/components/ui/Modal'
+import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
+import { WorkoutExerciseForm } from '@/features/workoutExercises/components/WorkoutExerciseForm'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'react-toastify'
-import type { Id } from 'react-toastify'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-
-const WORKOUTS_QUERY_KEY = (programId: string) =>
-  ['workouts', programId] as const
-const WORKOUT_EXERCISES_QUERY_KEY = (workoutId: string) =>
-  ['workoutExercises', workoutId] as const
 
 export function WorkoutDetailPage() {
   const { programId, workoutId } = useParams({
@@ -32,6 +34,12 @@ export function WorkoutDetailPage() {
 
   // Toggle exercise library visibility (desktop only)
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
+
+  // Confirm delete states
+  const [isDeleteWorkoutDialogOpen, setIsDeleteWorkoutDialogOpen] =
+    useState(false)
+  const [workoutExerciseToDelete, setWorkoutExerciseToDelete] =
+    useState<WorkoutExercise | null>(null)
 
   // Listen for mobile menu event
   useEffect(() => {
@@ -50,8 +58,13 @@ export function WorkoutDetailPage() {
     isError: isWorkoutsError,
     error: workoutsError,
   } = useQuery<Workout[], Error>({
-    queryKey: WORKOUTS_QUERY_KEY(programId),
-    queryFn: () => api<Workout[]>(`trainingprograms/${programId}/workouts`),
+    queryKey: workoutsKeys.list(programId),
+    queryFn: async () => {
+      const result = await api<Workout[]>(
+        `trainingprograms/${programId}/workouts`,
+      )
+      return result ?? []
+    },
   })
 
   useEffect(() => {
@@ -70,8 +83,13 @@ export function WorkoutDetailPage() {
     isError: isWorkoutExercisesError,
     error: workoutExercisesError,
   } = useQuery<WorkoutExercise[], Error>({
-    queryKey: WORKOUT_EXERCISES_QUERY_KEY(workoutId),
-    queryFn: () => api<WorkoutExercise[]>(`workouts/${workoutId}/exercises`),
+    queryKey: workoutExercisesKeys.list(workoutId),
+    queryFn: async () => {
+      const result = await api<WorkoutExercise[]>(
+        `workouts/${workoutId}/exercises`,
+      )
+      return result ?? []
+    },
   })
 
   useEffect(() => {
@@ -87,7 +105,7 @@ export function WorkoutDetailPage() {
   const [search, setSearch] = useState('')
 
   const exerciseQueryKey = useMemo(
-    () => ['exercises', { muscleGroup, equipment, difficulty }] as const,
+    () => exercisesKeys.list({ muscleGroup, equipment, difficulty }),
     [muscleGroup, equipment, difficulty],
   )
 
@@ -99,14 +117,15 @@ export function WorkoutDetailPage() {
     error: exercisesError,
   } = useQuery<Exercise[], Error>({
     queryKey: exerciseQueryKey,
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams()
       if (muscleGroup) params.set('MuscleGroup', muscleGroup)
       if (equipment) params.set('Equipment', equipment)
       if (difficulty) params.set('Difficulty', difficulty)
 
       const qs = params.toString()
-      return api<Exercise[]>(`exercises${qs ? `?${qs}` : ''}`)
+      const result = await api<Exercise[]>(`exercises${qs ? `?${qs}` : ''}`)
+      return result ?? []
     },
   })
 
@@ -122,14 +141,6 @@ export function WorkoutDetailPage() {
 
   // ========== ADD EXERCISE MODAL ==========
   const [isAddOpen, setIsAddOpen] = useState(false)
-  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(
-    null,
-  )
-
-  const [sets, setSets] = useState(3)
-  const [reps, setReps] = useState(10)
-  const [weight, setWeight] = useState<number | ''>('')
-  const [notes, setNotes] = useState('')
 
   // CREATE workout exercise mutation
   const createWorkoutExerciseMutation = useMutation<
@@ -147,7 +158,7 @@ export function WorkoutDetailPage() {
         },
       )
 
-      return await toast.promise(requestPromise, {
+      const result = await toast.promise(requestPromise, {
         pending: 'Adding exercise...',
         success: 'Exercise added to workout',
         error: {
@@ -157,67 +168,25 @@ export function WorkoutDetailPage() {
           },
         },
       })
+
+      if (!result) throw new Error('Failed to add exercise')
+      return result
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: WORKOUT_EXERCISES_QUERY_KEY(workoutId),
+        queryKey: workoutExercisesKeys.list(workoutId),
       })
 
       setIsAddOpen(false)
-      setSelectedExercise(null)
-      setSets(3)
-      setReps(10)
-      setWeight('')
-      setNotes('')
     },
   })
 
-  const openAddModal = (exercise: Exercise) => {
-    setSelectedExercise(exercise)
+  const openAddModal = () => {
     setIsAddOpen(true)
-  }
-
-  const handleCreateWorkoutExercise = (e: FormEvent) => {
-    e.preventDefault()
-
-    if (!selectedExercise) {
-      toast.warn('Select an exercise first')
-      return
-    }
-
-    if (sets <= 0 || reps <= 0) {
-      toast.warn('Sets and reps must be positive')
-      return
-    }
-
-    const weightValue = weight === '' ? undefined : weight
-    if (weightValue !== undefined && weightValue < 0) {
-      toast.warn('Weight cannot be negative')
-      return
-    }
-
-    createWorkoutExerciseMutation.mutate({
-      exerciseId: selectedExercise.id,
-      sets,
-      reps,
-      weight: weightValue,
-      notes: notes.trim() || undefined,
-    })
   }
 
   // ========== EDIT/DELETE WORKOUT ==========
   const [isEditWorkoutOpen, setIsEditWorkoutOpen] = useState(false)
-  const [editWorkoutName, setEditWorkoutName] = useState('')
-  const [editWorkoutDayOfWeek, setEditWorkoutDayOfWeek] = useState('')
-  const [editWorkoutNotes, setEditWorkoutNotes] = useState('')
-
-  // Sync modal fields when workout loads
-  useEffect(() => {
-    if (!workout) return
-    setEditWorkoutName(workout.name ?? '')
-    setEditWorkoutDayOfWeek(workout.dayOfWeek ?? '')
-    setEditWorkoutNotes(workout.notes ?? '')
-  }, [workout])
 
   // UPDATE workout mutation
   const updateWorkoutMutation = useMutation<void, Error, UpdateWorkoutInput>({
@@ -243,7 +212,7 @@ export function WorkoutDetailPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: WORKOUTS_QUERY_KEY(programId),
+        queryKey: workoutsKeys.list(programId),
       })
       setIsEditWorkoutOpen(false)
     },
@@ -269,112 +238,33 @@ export function WorkoutDetailPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: WORKOUTS_QUERY_KEY(programId),
+        queryKey: workoutsKeys.list(programId),
       })
       queryClient.removeQueries({
-        queryKey: WORKOUT_EXERCISES_QUERY_KEY(workoutId),
+        queryKey: workoutExercisesKeys.list(workoutId),
       })
       navigate({ to: '/programs/$programId', params: { programId } })
     },
   })
 
-  const submitEditWorkout = (e: FormEvent) => {
-    e.preventDefault()
-
-    const name = editWorkoutName.trim()
-    if (!name) {
-      toast.warn('Workout name is required')
-      return
-    }
-
-    updateWorkoutMutation.mutate({
-      name,
-      dayOfWeek: editWorkoutDayOfWeek.trim() || undefined,
-      notes: editWorkoutNotes.trim() || undefined,
-    })
-  }
-
+  // DELETE workout with optimistic undo
   const handleDeleteWorkout = () => {
-    // Store previous data for rollback
-    const previousWorkouts = queryClient.getQueryData<Workout[]>(
-      WORKOUTS_QUERY_KEY(programId),
-    )
+    const executeDelete = useUndoableDelete<Workout[]>({
+      queryKey: workoutsKeys.list(programId),
+      deleteFn: () => deleteWorkoutMutation.mutateAsync(),
+      optimisticUpdate: (old) => old?.filter((w) => w.id !== workoutId) ?? [],
+      itemLabel: workout?.name || 'workout',
+    })
 
-    // Optimistically remove from cache
-    queryClient.setQueryData<Workout[]>(
-      WORKOUTS_QUERY_KEY(programId),
-      (old) => old?.filter((w) => w.id !== workoutId) ?? [],
-    )
-
-    let timeoutId: NodeJS.Timeout | null = null
-    let toastId: Id | null = null
-    let isUndone = false
-
-    // Show undo toast
-    toastId = toast.info(
-      <div className="flex items-center justify-between gap-4 text-sm">
-        <span className="text-gray-700">
-          Deleted <strong>{workout?.name || 'workout'}</strong>
-        </span>
-        <button
-          onClick={() => {
-            isUndone = true
-            if (timeoutId) clearTimeout(timeoutId)
-            if (toastId) toast.dismiss(toastId)
-
-            // Rollback optimistic update
-            queryClient.setQueryData(
-              WORKOUTS_QUERY_KEY(programId),
-              previousWorkouts,
-            )
-
-            toast.success('Undo successful')
-          }}
-          className="shrink-0 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors"
-        >
-          Undo
-        </button>
-      </div>,
-      {
-        autoClose: 5000,
-        closeButton: false,
-        onClose: () => {
-          if (timeoutId) clearTimeout(timeoutId)
-        },
-      },
-    )
-
-    // Execute actual deletion after delay
-    timeoutId = setTimeout(() => {
-      if (!isUndone) {
-        deleteWorkoutMutation.mutate(undefined, {
-          onError: (error) => {
-            // Rollback on error
-            queryClient.setQueryData(
-              WORKOUTS_QUERY_KEY(programId),
-              previousWorkouts,
-            )
-            toast.error(error.message || 'Failed to delete workout')
-          },
-        })
-      }
-    }, 5000)
+    executeDelete()
   }
 
   // ========== EDIT/DELETE WORKOUT EXERCISE ==========
   const [isEditWEOpen, setIsEditWEOpen] = useState(false)
   const [editingWE, setEditingWE] = useState<WorkoutExercise | null>(null)
-  const [weSets, setWeSets] = useState(3)
-  const [weReps, setWeReps] = useState(10)
-  const [weWeight, setWeWeight] = useState<number | ''>('')
-  const [weNotes, setWeNotes] = useState('')
 
   const openEditWEModal = (we: WorkoutExercise) => {
     setEditingWE(we)
-    setWeSets(we.sets)
-    setWeReps(we.reps)
-    setWeWeight(we.weight ?? '')
-    setWeNotes(we.notes ?? '')
     setIsEditWEOpen(true)
   }
 
@@ -403,7 +293,7 @@ export function WorkoutDetailPage() {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: WORKOUT_EXERCISES_QUERY_KEY(workoutId),
+        queryKey: workoutExercisesKeys.list(workoutId),
       })
       setIsEditWEOpen(false)
       setEditingWE(null)
@@ -413,120 +303,27 @@ export function WorkoutDetailPage() {
   // DELETE workout exercise mutation
   const deleteWorkoutExerciseMutation = useMutation<void, Error, string>({
     mutationFn: async (workoutExerciseId) => {
-      const requestPromise = api(
-        `workouts/${workoutId}/exercises/${workoutExerciseId}`,
-        { method: 'DELETE' },
-      )
-
-      await toast.promise(requestPromise, {
-        pending: 'Removing exercise...',
-        success: 'Exercise removed',
-        error: {
-          render({ data }) {
-            return (data as Error)?.message ?? 'Remove failed'
-          },
-        },
+      await api(`workouts/${workoutId}/exercises/${workoutExerciseId}`, {
+        method: 'DELETE',
       })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
-        queryKey: WORKOUT_EXERCISES_QUERY_KEY(workoutId),
+        queryKey: workoutExercisesKeys.list(workoutId),
       })
     },
   })
 
-  const submitEditWorkoutExercise = (e: FormEvent) => {
-    e.preventDefault()
-
-    if (!editingWE) return
-
-    if (weSets <= 0 || weReps <= 0) {
-      toast.warn('Sets and reps must be positive')
-      return
-    }
-
-    const weightValue = weWeight === '' ? null : weWeight
-    if (weightValue !== null && weightValue < 0) {
-      toast.warn('Weight cannot be negative')
-      return
-    }
-
-    updateWorkoutExerciseMutation.mutate({
-      id: editingWE.id,
-      input: {
-        sets: weSets,
-        reps: weReps,
-        weight: weightValue,
-        notes: weNotes.trim() || null,
-      },
-    })
-  }
-
+  // DELETE workout exercise with optimistic undo
   const handleDeleteWE = (we: WorkoutExercise) => {
-    // Store previous data for rollback
-    const previousExercises = queryClient.getQueryData<WorkoutExercise[]>(
-      WORKOUT_EXERCISES_QUERY_KEY(workoutId),
-    )
+    const executeDelete = useUndoableDelete<WorkoutExercise[]>({
+      queryKey: workoutExercisesKeys.list(workoutId),
+      deleteFn: () => deleteWorkoutExerciseMutation.mutateAsync(we.id),
+      optimisticUpdate: (old) => old?.filter((ex) => ex.id !== we.id) ?? [],
+      itemLabel: we.exerciseName,
+    })
 
-    // Optimistically remove from cache
-    queryClient.setQueryData<WorkoutExercise[]>(
-      WORKOUT_EXERCISES_QUERY_KEY(workoutId),
-      (old) => old?.filter((ex) => ex.id !== we.id) ?? [],
-    )
-
-    let timeoutId: NodeJS.Timeout | null = null
-    let toastId: Id | null = null
-    let isUndone = false
-
-    // Show undo toast
-    toastId = toast.info(
-      <div className="flex items-center justify-between gap-4 text-sm">
-        <span className="text-gray-700">
-          Removed <strong>{we.exerciseName}</strong>
-        </span>
-        <button
-          onClick={() => {
-            isUndone = true
-            if (timeoutId) clearTimeout(timeoutId)
-            if (toastId) toast.dismiss(toastId)
-
-            // Rollback optimistic update
-            queryClient.setQueryData(
-              WORKOUT_EXERCISES_QUERY_KEY(workoutId),
-              previousExercises,
-            )
-
-            toast.success('Undo successful')
-          }}
-          className="shrink-0 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors"
-        >
-          Undo
-        </button>
-      </div>,
-      {
-        autoClose: 5000,
-        closeButton: false,
-        onClose: () => {
-          if (timeoutId) clearTimeout(timeoutId)
-        },
-      },
-    )
-
-    // Execute actual deletion after delay
-    timeoutId = setTimeout(() => {
-      if (!isUndone) {
-        deleteWorkoutExerciseMutation.mutate(we.id, {
-          onError: (error) => {
-            // Rollback on error
-            queryClient.setQueryData(
-              WORKOUT_EXERCISES_QUERY_KEY(workoutId),
-              previousExercises,
-            )
-            toast.error(error.message || 'Failed to remove exercise')
-          },
-        })
-      }
-    }, 5000)
+    executeDelete()
   }
 
   // ========== RENDER HELPERS ==========
@@ -578,7 +375,7 @@ export function WorkoutDetailPage() {
 
               <button
                 className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                onClick={() => openAddModal(ex)}
+                onClick={openAddModal}
               >
                 Add
               </button>
@@ -605,13 +402,13 @@ export function WorkoutDetailPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsEditWorkoutOpen(true)}
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
             >
               Edit
             </button>
             <button
-              onClick={handleDeleteWorkout}
-              className="rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+              onClick={() => setIsDeleteWorkoutDialogOpen(true)}
+              className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
             >
               Delete
             </button>
@@ -666,7 +463,10 @@ export function WorkoutDetailPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteWE(we)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setWorkoutExerciseToDelete(we)
+                        }}
                         className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
                       >
                         Remove
@@ -731,7 +531,10 @@ export function WorkoutDetailPage() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteWE(we)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setWorkoutExerciseToDelete(we)
+                        }}
                         className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
                       >
                         Remove
@@ -748,258 +551,127 @@ export function WorkoutDetailPage() {
       </div>
 
       {/* Modal for adding exercise */}
-      {isAddOpen && selectedExercise && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <h3 className="text-lg font-semibold text-gray-900 truncate">
-                  Add: {selectedExercise.name}
-                </h3>
-                <p className="text-xs text-gray-600">
-                  {humanizeEnum(selectedExercise.muscleGroup)} •{' '}
-                  {humanizeEnum(selectedExercise.equipment)} •{' '}
-                  {humanizeEnum(selectedExercise.difficulty)}
-                </p>
-              </div>
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                onClick={() => setIsAddOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateWorkoutExercise} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
-                    Sets
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={sets}
-                    onChange={(e) => setSets(Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
-                    Reps
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={reps}
-                    onChange={(e) => setReps(Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="space-y-1 col-span-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Weight (kg, optional)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.1"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={weight}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setWeight(v === '' ? '' : Number(v))
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-1 col-span-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Notes (optional)
-                  </label>
-                  <textarea
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-                disabled={createWorkoutExerciseMutation.isPending}
-              >
-                {createWorkoutExerciseMutation.isPending
-                  ? 'Adding...'
-                  : 'Add to workout'}
-              </button>
-            </form>
-          </div>
-        </div>
+      {isAddOpen && (
+        <Modal
+          isOpen={isAddOpen}
+          onClose={() => setIsAddOpen(false)}
+          title="Add Exercise to Workout"
+        >
+          <WorkoutExerciseForm
+            exercises={exercises}
+            submitLabel="Add Exercise"
+            isSubmitting={createWorkoutExerciseMutation.isPending}
+            onSubmit={(values) => {
+              const input: CreateWorkoutExerciseInput = {
+                exerciseId: values.exerciseId,
+                sets: values.sets,
+                reps: values.reps,
+                weight: values.weight ? Number(values.weight) : undefined,
+                notes: values.notes,
+              }
+              createWorkoutExerciseMutation.mutate(input)
+            }}
+            onCancel={() => setIsAddOpen(false)}
+          />
+        </Modal>
       )}
 
       {/* Modal for editing workout */}
       {isEditWorkoutOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Edit Workout
-              </h3>
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                onClick={() => setIsEditWorkoutOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={submitEditWorkout} className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editWorkoutName}
-                  onChange={(e) => setEditWorkoutName(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Day of Week (optional)
-                </label>
-                <select
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editWorkoutDayOfWeek}
-                  onChange={(e) => setEditWorkoutDayOfWeek(e.target.value)}
-                >
-                  <option value="">Select a day...</option>
-                  <option value="Monday">Monday</option>
-                  <option value="Tuesday">Tuesday</option>
-                  <option value="Wednesday">Wednesday</option>
-                  <option value="Thursday">Thursday</option>
-                  <option value="Friday">Friday</option>
-                  <option value="Saturday">Saturday</option>
-                  <option value="Sunday">Sunday</option>
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Notes (optional)
-                </label>
-                <textarea
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editWorkoutNotes}
-                  onChange={(e) => setEditWorkoutNotes(e.target.value)}
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-blue-600 py-2 font-medium text-white hover:bg-blue-700"
-                disabled={updateWorkoutMutation.isPending}
-              >
-                {updateWorkoutMutation.isPending
-                  ? 'Updating...'
-                  : 'Update Workout'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <Modal
+          isOpen={isEditWorkoutOpen}
+          onClose={() => setIsEditWorkoutOpen(false)}
+          title="Edit Workout"
+        >
+          <WorkoutForm
+            defaultValues={
+              workout
+                ? {
+                    name: workout.name,
+                    dayOfWeek: workout.dayOfWeek ?? undefined,
+                    notes: workout.notes ?? undefined,
+                  }
+                : undefined
+            }
+            submitLabel="Update Workout"
+            isSubmitting={updateWorkoutMutation.isPending}
+            onSubmit={(values) => {
+              updateWorkoutMutation.mutate(values)
+            }}
+            onCancel={() => setIsEditWorkoutOpen(false)}
+          />
+        </Modal>
       )}
 
       {/* Modal for editing workout exercise */}
       {isEditWEOpen && editingWE && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-4 shadow-xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Edit: {editingWE.exerciseName}
-              </h3>
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                onClick={() => setIsEditWEOpen(false)}
-              >
-                Close
-              </button>
-            </div>
-
-            <form onSubmit={submitEditWorkoutExercise} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
-                    Sets
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={weSets}
-                    onChange={(e) => setWeSets(Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-medium text-gray-700">
-                    Reps
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={weReps}
-                    onChange={(e) => setWeReps(Number(e.target.value))}
-                  />
-                </div>
-
-                <div className="space-y-1 col-span-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Weight (kg, optional)
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="0.1"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={weWeight}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setWeWeight(v === '' ? '' : Number(v))
-                    }}
-                  />
-                </div>
-
-                <div className="space-y-1 col-span-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Notes (optional)
-                  </label>
-                  <textarea
-                    className="w-full rounded-md border border-gray-300 px-3 py-2"
-                    value={weNotes}
-                    onChange={(e) => setWeNotes(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-blue-600 py-2 font-medium text-white hover:bg-blue-700"
-                disabled={updateWorkoutExerciseMutation.isPending}
-              >
-                {updateWorkoutExerciseMutation.isPending
-                  ? 'Updating...'
-                  : 'Update Exercise'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <Modal
+          isOpen={isEditWEOpen}
+          onClose={() => setIsEditWEOpen(false)}
+          title="Edit Exercise"
+        >
+          <WorkoutExerciseForm
+            defaultValues={
+              editingWE
+                ? {
+                    exerciseId: editingWE.exerciseId,
+                    sets: editingWE.sets,
+                    reps: editingWE.reps,
+                    weight:
+                      editingWE.weight != null
+                        ? String(editingWE.weight)
+                        : undefined,
+                    notes: editingWE.notes ?? undefined,
+                  }
+                : undefined
+            }
+            submitLabel="Update Exercise"
+            isSubmitting={updateWorkoutExerciseMutation.isPending}
+            showExerciseSelector={false}
+            onSubmit={(values) => {
+              if (editingWE) {
+                const input: UpdateWorkoutExerciseInput = {
+                  sets: values.sets,
+                  reps: values.reps,
+                  weight: values.weight ? Number(values.weight) : undefined,
+                  notes: values.notes,
+                }
+                updateWorkoutExerciseMutation.mutate({
+                  id: editingWE.id,
+                  input,
+                })
+              }
+            }}
+            onCancel={() => setIsEditWEOpen(false)}
+          />
+        </Modal>
       )}
+
+      {/* Confirm Delete Workout Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteWorkoutDialogOpen}
+        onClose={() => setIsDeleteWorkoutDialogOpen(false)}
+        onConfirm={handleDeleteWorkout}
+        title="Delete Workout"
+        description={`Are you sure you want to delete "${workout?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
+
+      {/* Confirm Delete Workout Exercise Dialog */}
+      <ConfirmDialog
+        isOpen={!!workoutExerciseToDelete}
+        onClose={() => setWorkoutExerciseToDelete(null)}
+        onConfirm={() =>
+          workoutExerciseToDelete && handleDeleteWE(workoutExerciseToDelete)
+        }
+        title="Remove Exercise"
+        description={`Are you sure you want to remove "${workoutExerciseToDelete?.exerciseName}" from this workout?`}
+        confirmText="Remove"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
     </div>
   )
 }
