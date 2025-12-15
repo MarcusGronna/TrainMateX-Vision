@@ -1,9 +1,4 @@
-import {
-  Category,
-  MuscleGroup,
-  Equipment,
-  Difficulty,
-} from '@/lib/exerciseEnums'
+import { MuscleGroup, Equipment, Difficulty } from '@/lib/exerciseEnums'
 
 interface ExerciseFiltersProps {
   category: string
@@ -17,33 +12,15 @@ interface ExerciseFiltersProps {
 }
 
 export function ExerciseFilters({
-  category,
   muscleGroup,
   equipment,
   difficulty,
-  onCategoryChange,
   onMuscleGroupChange,
   onEquipmentChange,
   onDifficultyChange,
 }: ExerciseFiltersProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div>
-        <label className="text-sm font-medium text-gray-700">Category</label>
-        <select
-          value={category}
-          onChange={(e) => onCategoryChange(e.target.value)}
-          className="w-full rounded-md border border-gray-300 px-3 py-2"
-        >
-          <option value="all">All</option>
-          {Object.values(Category).map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </select>
-      </div>
-
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
       <div>
         <label className="text-sm font-medium text-gray-700">
           Muscle Group

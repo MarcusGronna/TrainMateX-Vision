@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
 import type { Exercise } from '@/types/Exercise'
-import { MUSCLE_GROUPS, EQUIPMENT, DIFFICULTIES } from '@/lib/exerciseEnums'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { useApi } from '@/lib/api/useApi'
 import { useQuery } from '@tanstack/react-query'
@@ -10,34 +9,36 @@ export function ExerciseLibraryPage() {
   const { api } = useApi()
 
   // Filters
-  const [muscleGroupFilter, setMuscleGroupFilter] = useState<string>('all')
-  const [equipmentFilter, setEquipmentFilter] = useState<string>('all')
-  const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
+  const [muscleGroup, setMuscleGroup] = useState('all')
+  const [equipment, setEquipment] = useState('all')
+  const [difficulty, setDifficulty] = useState('all')
 
-  // Fetch exercises
+  // Fetch exercises with filters
+  const exerciseQueryKey = useMemo(
+    () => ['exercises', { muscleGroup, equipment, difficulty }] as const,
+    [muscleGroup, equipment, difficulty],
+  )
+
   const {
-    data: exercises,
+    data: exercises = [],
     isLoading,
     error,
   } = useQuery({
-    queryKey: ['exercises'],
-    queryFn: () => api<Exercise[]>('/exercises'),
+    queryKey: exerciseQueryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams()
+      if (muscleGroup && muscleGroup !== 'all')
+        params.set('MuscleGroup', muscleGroup)
+      if (equipment && equipment !== 'all') params.set('Equipment', equipment)
+      if (difficulty && difficulty !== 'all')
+        params.set('Difficulty', difficulty)
+
+      const qs = params.toString()
+      const url = `/exercises${qs ? `?${qs}` : ''}`
+
+      return api<Exercise[]>(url)
+    },
   })
-
-  // Filter exercises
-  const filteredExercises = useMemo(() => {
-    if (!exercises) return []
-
-    return exercises.filter((ex: Exercise) => {
-      if (muscleGroupFilter !== 'all' && ex.muscleGroup !== muscleGroupFilter)
-        return false
-      if (equipmentFilter !== 'all' && ex.equipment !== equipmentFilter)
-        return false
-      if (difficultyFilter !== 'all' && ex.difficulty !== difficultyFilter)
-        return false
-      return true
-    })
-  }, [exercises, muscleGroupFilter, equipmentFilter, difficultyFilter])
 
   if (isLoading) {
     return (
@@ -67,20 +68,19 @@ export function ExerciseLibraryPage() {
 
       <div className="mb-6">
         <ExerciseFilters
-          muscleGroup={muscleGroupFilter}
-          equipment={equipmentFilter}
-          difficulty={difficultyFilter}
-          onMuscleGroupChange={setMuscleGroupFilter}
-          onEquipmentChange={setEquipmentFilter}
-          onDifficultyChange={setDifficultyFilter}
-          muscleGroups={MUSCLE_GROUPS}
-          equipmentOptions={EQUIPMENT}
-          difficulties={DIFFICULTIES}
+          category="all"
+          muscleGroup={muscleGroup}
+          equipment={equipment}
+          difficulty={difficulty}
+          onCategoryChange={() => {}}
+          onMuscleGroupChange={setMuscleGroup}
+          onEquipmentChange={setEquipment}
+          onDifficultyChange={setDifficulty}
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredExercises.map((exercise: Exercise) => (
+        {exercises.map((exercise: Exercise) => (
           <div
             key={exercise.id}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
@@ -104,7 +104,7 @@ export function ExerciseLibraryPage() {
         ))}
       </div>
 
-      {filteredExercises.length === 0 && (
+      {exercises.length === 0 && (
         <div className="text-center text-gray-600 py-12">
           No exercises found matching your filters.
         </div>
