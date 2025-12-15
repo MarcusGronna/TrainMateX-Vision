@@ -23,7 +23,7 @@ export function useApi() {
   ): Promise<T | undefined> {
     const token = await getToken()
     if (!token) {
-      throw new Error('Missing auth token')
+      throw new Error('Missing auth token, user not logged in')
     }
 
     const url = `${import.meta.env.VITE_API_BASE_URL}${path}`
@@ -39,7 +39,8 @@ export function useApi() {
     // Handle errors
     if (!response.ok) {
       const errorText = await response.text()
-      throw new Error(errorText || `Request failed (status ${response.status})`)
+      console.log(`Error: ${response.status}`)
+      throw new Error(errorText || `Unknown error. See console for more info.`)
     }
 
     // Handle 204 No Content
