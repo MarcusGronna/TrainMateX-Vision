@@ -21,7 +21,6 @@ export function ProgramDetailPage() {
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [dayOfWeek, setDayOfWeek] = useState<number | ''>(1)
 
   // Fetch program
   const { data: program, isLoading: isProgramLoading } = useQuery<
@@ -72,11 +71,7 @@ export function ProgramDetailPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: async (input: {
-      name: string
-      description?: string
-      dayOfWeek?: number
-    }) => {
+    mutationFn: async (input: { name: string; description?: string }) => {
       const token = await getToken()
       if (!token) throw new Error('Missing auth token')
 
@@ -104,7 +99,6 @@ export function ProgramDetailPage() {
       setShowCreateModal(false)
       setName('')
       setDescription('')
-      setDayOfWeek(1)
     },
   })
 
@@ -113,7 +107,6 @@ export function ProgramDetailPage() {
       id: string
       name: string
       description?: string
-      dayOfWeek?: number
     }) => {
       const token = await getToken()
       if (!token) throw new Error('Missing auth token')
@@ -144,7 +137,6 @@ export function ProgramDetailPage() {
       setEditingWorkout(null)
       setName('')
       setDescription('')
-      setDayOfWeek(1)
     },
   })
 
@@ -191,7 +183,6 @@ export function ProgramDetailPage() {
     createMutation.mutate({
       name,
       description: description.trim() || undefined,
-      dayOfWeek: dayOfWeek === '' ? undefined : dayOfWeek,
     })
   }
 
@@ -203,7 +194,6 @@ export function ProgramDetailPage() {
       id: editingWorkout.id,
       name,
       description: description.trim() || undefined,
-      dayOfWeek: dayOfWeek === '' ? undefined : dayOfWeek,
     })
   }
 
@@ -264,45 +254,45 @@ export function ProgramDetailPage() {
           ) : (
             <ul className="space-y-3">
               {workouts.map((workout) => (
-                <li
-                  key={workout.id}
-                  className="rounded-lg border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100 hover:border-gray-300 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <Link
-                        to="/programs/$programId/workouts/$workoutId"
-                        params={{ programId, workoutId: workout.id }}
-                        className="text-lg font-semibold text-indigo-600 hover:text-indigo-700 focus:outline-none focus:underline"
-                      >
-                        {workout.name}
-                      </Link>
-                      {workout.description && (
-                        <p className="text-gray-700 mt-1">
-                          {workout.description}
-                        </p>
-                      )}
-                      {workout.dayOfWeek && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          Day {workout.dayOfWeek}
-                        </p>
-                      )}
+                <li key={workout.id} className="relative group">
+                  <Link
+                    to="/programs/$programId/workouts/$workoutId"
+                    params={{ programId, workoutId: workout.id }}
+                    className="block rounded-lg border border-gray-200 bg-gray-50 p-4 hover:bg-gray-100 hover:border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-lg font-semibold text-indigo-600 group-hover:text-indigo-700">
+                          {workout.name}
+                        </h3>
+                        {workout.description && (
+                          <p className="text-gray-700 mt-1">
+                            {workout.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            openEditModal(workout)
+                          }}
+                          className="relative z-10 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            executeDelete(workout)
+                          }}
+                          className="relative z-10 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => openEditModal(workout)}
-                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => executeDelete(workout)}
-                        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -351,25 +341,6 @@ export function ProgramDetailPage() {
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Brief description of the workout..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Day of Week{' '}
-                    <span className="text-gray-500 font-normal">optional</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={7}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    value={dayOfWeek}
-                    onChange={(e) =>
-                      setDayOfWeek(
-                        e.target.value === '' ? '' : Number(e.target.value),
-                      )
-                    }
                   />
                 </div>
 
@@ -425,25 +396,6 @@ export function ProgramDetailPage() {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Day of Week{' '}
-                    <span className="text-gray-500 font-normal">optional</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={7}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    value={dayOfWeek}
-                    onChange={(e) =>
-                      setDayOfWeek(
-                        e.target.value === '' ? '' : Number(e.target.value),
-                      )
-                    }
                   />
                 </div>
 
