@@ -22,8 +22,16 @@ export default function Header() {
           <Menu size={24} />
         </button>
         <h1 className="ml-4 text-xl font-semibold">
-          <Link to="/" className="hover:text-indigo-400 transition-colors">
-            TrainMateX-Vision
+          <Link
+            to="/"
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
+            <img
+              src="/logo.png"
+              alt="TrainMateX Vision"
+              className="h-16 w-auto"
+            />
+            <span className="sr-only">TrainMateX-Vision</span>
           </Link>
         </h1>
       </header>
