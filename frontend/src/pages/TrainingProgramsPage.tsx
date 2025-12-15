@@ -199,7 +199,7 @@ export function TrainingProgramsPage() {
                   <Link
                     to="/programs/$programId"
                     params={{ programId: program.id }}
-                    className="flex-1 min-w-0 hover:bg-gray-50 transition-colors rounded-md p-2 -m-2"
+                    className="flex-1 min-w-0 hover:bg-gray-50 transition-colors rounded-md p-2 -m-2 block"
                   >
                     <p className="font-semibold text-gray-900">
                       {program.name}
@@ -271,7 +271,10 @@ export function TrainingProgramsPage() {
               ? {
                   name: editingProgram.name,
                   description: editingProgram.description ?? undefined,
-                  level: editingProgram.level,
+                  level: (editingProgram.level ?? 'beginner') as
+                    | 'beginner'
+                    | 'intermediate'
+                    | 'advanced',
                 }
               : undefined
           }

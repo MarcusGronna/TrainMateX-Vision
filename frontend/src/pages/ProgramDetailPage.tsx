@@ -1,21 +1,22 @@
-import type { TrainingProgram } from '@/types/TrainingProgram'
-import type { Workout } from '@/types/Workout'
-import type { UpdateTrainingProgramInput } from '@/types/CreateTrainingProgramInput'
-import type { CreateWorkoutInput } from '@/types/Workout'
+import type {
+  TrainingProgram,
+  UpdateTrainingProgramInput,
+} from '@/types/TrainingProgram'
+import type { Workout, CreateWorkoutInput } from '@/types/Workout'
 import { humanizeEnum } from '@/lib/humanizeEnum'
-import { BackLink } from '@/components/BackLink'
 import { useApi } from '@/lib/api/useApi'
 import { programsKeys } from '@/features/programs/keys'
 import { workoutsKeys } from '@/features/workouts/keys'
+import { BackLink } from '@/components/BackLink'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ProgramForm } from '@/features/programs/components/ProgramForm'
 import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useParams, useNavigate, Link } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'react-toastify'
 
 export function ProgramDetailPage() {
@@ -181,7 +182,7 @@ export function ProgramDetailPage() {
         queryKey: programsKeys.list(),
       })
       setIsDeleteProgramDialogOpen(false)
-      navigate({ to: '/programs' })
+      navigate({ to: '/' })
     },
   })
 
@@ -379,55 +380,55 @@ export function ProgramDetailPage() {
             No workouts yet. Add your first one!
           </p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="divide-y rounded-md border">
             {workouts.map((workout) => (
-              <li key={workout.id} className="rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    to="/programs/$programId/workouts/$workoutId"
-                    params={{ programId, workoutId: workout.id }}
-                    className="flex-1 min-w-0 hover:bg-gray-50 transition-colors rounded-md p-2 -m-2"
-                  >
-                    <p className="font-semibold text-gray-900">
-                      {workout.name}
-                    </p>
-                    {workout.dayOfWeek && (
-                      <p className="text-sm text-gray-600">
-                        {workout.dayOfWeek}
+              <li key={workout.id}>
+                <Link
+                  to="/programs/$programId/workouts/$workoutId"
+                  params={{ programId, workoutId: workout.id }}
+                  className="block p-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-900 truncate">
+                        {workout.name}
                       </p>
-                    )}
-                    {workout.notes && (
-                      <p className="text-sm text-gray-700 mt-1">
-                        {workout.notes}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-400 mt-2">
-                      Created:{' '}
-                      {new Date(workout.createdAt).toLocaleDateString()}
-                    </p>
-                  </Link>
+                      {workout.dayOfWeek && (
+                        <p className="text-sm text-gray-600">
+                          {workout.dayOfWeek}
+                        </p>
+                      )}
+                      {workout.notes && (
+                        <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                          {workout.notes}
+                        </p>
+                      )}
+                    </div>
 
-                  <div className="flex flex-col gap-1 shrink-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openEditWorkoutModal(workout)
-                      }}
-                      className="text-xs rounded-md bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setWorkoutToDelete(workout)
-                      }}
-                      className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
-                    >
-                      Delete
-                    </button>
+                    <div className="flex gap-1 shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          openEditWorkoutModal(workout)
+                        }}
+                        className="text-xs rounded-md bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDeleteWorkout(workout)
+                        }}
+                        className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                </div>
+                </Link>
               </li>
             ))}
           </ul>
@@ -460,7 +461,10 @@ export function ProgramDetailPage() {
               ? {
                   name: program.name,
                   description: program.description ?? undefined,
-                  level: program.level,
+                  level: (program.level ?? 'beginner') as
+                    | 'beginner'
+                    | 'intermediate'
+                    | 'advanced',
                 }
               : undefined
           }
