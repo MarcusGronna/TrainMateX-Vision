@@ -1,19 +1,20 @@
-import { Link, type LinkProps } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faLongArrowAltLeft } from '@fortawesome/free-solid-svg-icons'
+import { faArrowLeft } from '@fortawesome/free-solid-svg-icons'
 
-interface BackLinkProps extends Omit<LinkProps, 'children'> {
+interface BackLinkProps {
+  to: string
   label?: string
 }
 
-export function BackLink({ label = 'Back', ...props }: BackLinkProps) {
+export function BackLink({ to, label = 'Back' }: BackLinkProps) {
   return (
     <Link
-      {...props}
+      to={to as any}
       className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-2 text-sm font-medium text-white hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
     >
-      <FontAwesomeIcon icon={faLongArrowAltLeft} size="sm" />
-      Back
+      <FontAwesomeIcon icon={faArrowLeft} size="sm" />
+      {label}
     </Link>
   )
 }
