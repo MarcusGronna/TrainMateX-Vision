@@ -488,7 +488,7 @@ export function ProgramDetailPage() {
               Level: {humanizeEnum(program.level)}
             </p>
           )}
-          <BackLink to="/programs" label="Back to Programs" />
+          <BackLink to="/" label="Back to Programs" />
         </div>
 
         {program && (
