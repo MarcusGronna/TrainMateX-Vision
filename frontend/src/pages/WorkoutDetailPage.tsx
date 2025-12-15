@@ -17,6 +17,7 @@ import { Modal } from '@/components/ui/Modal'
 import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
 import { WorkoutExerciseForm } from '@/features/workoutExercises/components/WorkoutExerciseForm'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
+import { MUSCLE_GROUPS, EQUIPMENT, DIFFICULTIES } from '@/lib/exerciseEnums'
 
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
@@ -336,64 +337,92 @@ export function WorkoutDetailPage() {
   }
 
   // ========== RENDER HELPERS ==========
-  const ExerciseLibrarySection = () => (
-    <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
-      <div className="space-y-1">
-        <h2 className="text-lg font-semibold text-gray-900">
-          Exercise Library
-        </h2>
-        <p className="text-sm text-gray-600">
-          Filter and search exercises to add to this workout.
-        </p>
+  const ExerciseLibrarySection = () => {
+    const [muscleGroupFilter, setMuscleGroupFilter] = useState<string>('all')
+    const [equipmentFilter, setEquipmentFilter] = useState<string>('all')
+    const [difficultyFilter, setDifficultyFilter] = useState<string>('all')
+
+    const filteredExercises = useMemo(() => {
+      if (!exercises) return []
+
+      return exercises.filter((ex) => {
+        if (muscleGroupFilter !== 'all' && ex.muscleGroup !== muscleGroupFilter)
+          return false
+        if (equipmentFilter !== 'all' && ex.equipment !== equipmentFilter)
+          return false
+        if (difficultyFilter !== 'all' && ex.difficulty !== difficultyFilter)
+          return false
+        return true
+      })
+    }, [exercises, muscleGroupFilter, equipmentFilter, difficultyFilter])
+
+    return (
+      <div className="space-y-6">
+        <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Exercise Library
+            </h2>
+            <p className="text-sm text-gray-600">
+              Filter and search exercises to add to this workout.
+            </p>
+          </div>
+
+          <ExerciseFilters
+            muscleGroup={muscleGroupFilter}
+            equipment={equipmentFilter}
+            difficulty={difficultyFilter}
+            onMuscleGroupChange={setMuscleGroupFilter}
+            onEquipmentChange={setEquipmentFilter}
+            onDifficultyChange={setDifficultyFilter}
+            muscleGroups={MUSCLE_GROUPS}
+            equipmentOptions={EQUIPMENT}
+            difficulties={DIFFICULTIES}
+          />
+
+          {isExercisesLoading ? (
+            <p className="text-sm text-gray-600">Loading exercises...</p>
+          ) : filteredExercises.length === 0 ? (
+            <p className="text-sm text-gray-600">
+              No exercises match the filters.
+            </p>
+          ) : (
+            <ul className="divide-y rounded-md border">
+              {filteredExercises.map((ex) => (
+                <li
+                  key={ex.id}
+                  className="p-3 flex items-start justify-between gap-3"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 truncate">
+                      {ex.name}
+                    </p>
+                    <p className="text-xs text-gray-600">
+                      {humanizeEnum(ex.muscleGroup)} •{' '}
+                      {humanizeEnum(ex.equipment)} •{' '}
+                      {humanizeEnum(ex.difficulty)}
+                    </p>
+                    {ex.description && (
+                      <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                        {ex.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                    onClick={openAddModal}
+                  >
+                    Add
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
-
-      <ExerciseFilters
-        muscleGroup={muscleGroup}
-        setMuscleGroup={setMuscleGroup}
-        equipment={equipment}
-        setEquipment={setEquipment}
-        difficulty={difficulty}
-        setDifficulty={setDifficulty}
-        search={search}
-        setSearch={setSearch}
-      />
-
-      {isExercisesLoading ? (
-        <p className="text-sm text-gray-600">Loading exercises...</p>
-      ) : filteredExercises.length === 0 ? (
-        <p className="text-sm text-gray-600">No exercises match the filters.</p>
-      ) : (
-        <ul className="divide-y rounded-md border">
-          {filteredExercises.map((ex) => (
-            <li
-              key={ex.id}
-              className="p-3 flex items-start justify-between gap-3"
-            >
-              <div className="min-w-0">
-                <p className="font-medium text-gray-900 truncate">{ex.name}</p>
-                <p className="text-xs text-gray-600">
-                  {humanizeEnum(ex.muscleGroup)} • {humanizeEnum(ex.equipment)}{' '}
-                  • {humanizeEnum(ex.difficulty)}
-                </p>
-                {ex.description && (
-                  <p className="text-sm text-gray-700 mt-1 line-clamp-2">
-                    {ex.description}
-                  </p>
-                )}
-              </div>
-
-              <button
-                className="shrink-0 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-                onClick={openAddModal}
-              >
-                Add
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  )
+    )
+  }
 
   return (
     <div className="mx-auto max-w-7xl p-4">
