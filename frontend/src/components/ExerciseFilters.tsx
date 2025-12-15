@@ -1,74 +1,75 @@
-import { humanizeEnum } from '@/lib/humanizeEnum'
-import { DIFFICULTIES, EQUIPMENT, MUSCLE_GROUPS } from '@/lib/exerciseEnums'
+import { MuscleGroup, Equipment, Difficulty } from '@/lib/exerciseEnums'
 
 interface ExerciseFiltersProps {
+  category: string
   muscleGroup: string
-  setMuscleGroup: (value: string) => void
   equipment: string
-  setEquipment: (value: string) => void
   difficulty: string
-  setDifficulty: (value: string) => void
-  search: string
-  setSearch: (value: string) => void
+  onCategoryChange: (value: string) => void
+  onMuscleGroupChange: (value: string) => void
+  onEquipmentChange: (value: string) => void
+  onDifficultyChange: (value: string) => void
 }
 
 export function ExerciseFilters({
   muscleGroup,
-  setMuscleGroup,
   equipment,
-  setEquipment,
   difficulty,
-  setDifficulty,
-  search,
-  setSearch,
+  onMuscleGroupChange,
+  onEquipmentChange,
+  onDifficultyChange,
 }: ExerciseFiltersProps) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <select
-        className="rounded-md border border-gray-300 px-3 py-2 bg-white"
-        value={muscleGroup}
-        onChange={(e) => setMuscleGroup(e.target.value)}
-      >
-        <option value="">All Muscle Groups</option>
-        {MUSCLE_GROUPS.map((mg) => (
-          <option key={mg} value={mg}>
-            {humanizeEnum(mg)}
-          </option>
-        ))}
-      </select>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <label className="text-sm font-medium text-gray-700">
+          Muscle Group
+        </label>
+        <select
+          value={muscleGroup}
+          onChange={(e) => onMuscleGroupChange(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-2"
+        >
+          <option value="all">All</option>
+          {Object.values(MuscleGroup).map((mg) => (
+            <option key={mg} value={mg}>
+              {mg}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <select
-        className="rounded-md border border-gray-300 px-3 py-2 bg-white"
-        value={equipment}
-        onChange={(e) => setEquipment(e.target.value)}
-      >
-        <option value="">All Equipment</option>
-        {EQUIPMENT.map((eq) => (
-          <option key={eq} value={eq}>
-            {humanizeEnum(eq)}
-          </option>
-        ))}
-      </select>
+      <div>
+        <label className="text-sm font-medium text-gray-700">Equipment</label>
+        <select
+          value={equipment}
+          onChange={(e) => onEquipmentChange(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-2"
+        >
+          <option value="all">All</option>
+          {Object.values(Equipment).map((eq) => (
+            <option key={eq} value={eq}>
+              {eq}
+            </option>
+          ))}
+        </select>
+      </div>
 
-      <select
-        className="rounded-md border border-gray-300 px-3 py-2 bg-white"
-        value={difficulty}
-        onChange={(e) => setDifficulty(e.target.value)}
-      >
-        <option value="">All Difficulties</option>
-        {DIFFICULTIES.map((diff) => (
-          <option key={diff} value={diff}>
-            {diff}
-          </option>
-        ))}
-      </select>
-
-      <input
-        className="rounded-md border border-gray-300 px-3 py-2"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search by name..."
-      />
+      <div>
+        <label className="text-sm font-medium text-gray-700">Difficulty</label>
+        <select
+          value={difficulty}
+          onChange={(e) => onDifficultyChange(e.target.value)}
+          className="w-full rounded-md border border-gray-300 px-3 py-2"
+        >
+          <option value="all">All</option>
+          {Object.values(Difficulty).map((diff) => (
+            <option key={diff} value={diff}>
+              {diff}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   )
 }

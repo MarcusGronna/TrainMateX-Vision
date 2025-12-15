@@ -10,7 +10,17 @@ public static class DependencyInjection
         services.AddDbContext<TrainMateXDbContext>(options =>
         {
             options.UseSqlServer(
-                config.GetConnectionString("DefaultConnection"));
+                config.GetConnectionString("DefaultConnection"),
+                sql =>
+                {
+                    sql.EnableRetryOnFailure(
+                        maxRetryCount: 5,
+                        maxRetryDelay: TimeSpan.FromSeconds(10),
+                        errorNumbersToAdd: null);
+
+                    sql.CommandTimeout(30);
+
+                });
         });
 
         // will add repository registrations here

@@ -1,127 +1,67 @@
-import type {
-  CreateTrainingProgramInput,
-  UpdateTrainingProgramInput,
-} from '@/types/CreateTrainingProgramInput'
 import type { TrainingProgram } from '@/types/TrainingProgram'
-import { useAuth } from '@clerk/clerk-react'
+import type { CreateTrainingProgramInput } from '@/types/CreateTrainingProgramInput'
+import { humanizeEnum } from '@/lib/humanizeEnum'
+import { useApi } from '@/lib/api/useApi'
+import { programsKeys } from '@/features/programs/keys'
+import { Modal } from '@/components/ui/Modal'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ProgramForm } from '@/features/programs/components/ProgramForm'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { useEffect, useState, type FormEvent } from 'react'
 import { toast } from 'react-toastify'
 
-const TRAINING_PROGRAMS_QUERY_KEY = ['trainingprograms'] as const
-const LAST_USED_PROGRAM_KEY = 'lastUsedProgramId'
-
 export function TrainingProgramsPage() {
-  const { getToken } = useAuth()
+  const { api } = useApi()
   const queryClient = useQueryClient()
 
-  // Toggle visibility of form and programs list
-  const [showForm, setShowForm] = useState(false)
-  const [showPrograms, setShowPrograms] = useState(false)
-  const [lastUsedProgramId, setLastUsedProgramId] = useState<string | null>(
-    localStorage.getItem(LAST_USED_PROGRAM_KEY),
-  )
-
-  // Create form state
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [level, setLevel] = useState<'beginner' | 'intermediate' | 'advanced'>(
-    'beginner',
-  )
-
-  // Edit modal state
+  // Modal states
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingProgram, setEditingProgram] = useState<TrainingProgram | null>(
     null,
   )
-  const [editName, setEditName] = useState('')
-  const [editDescription, setEditDescription] = useState('')
-  const [editLevel, setEditLevel] = useState<
-    'beginner' | 'intermediate' | 'advanced'
-  >('beginner')
 
+  // Confirm delete state
+  const [programToDelete, setProgramToDelete] =
+    useState<TrainingProgram | null>(null)
+
+  // Fetch programs
   const {
     data: programs = [],
     isPending,
     isError,
     error,
   } = useQuery<TrainingProgram[], Error>({
-    queryKey: TRAINING_PROGRAMS_QUERY_KEY,
+    queryKey: programsKeys.list(),
     queryFn: async () => {
-      const token = await getToken()
-      if (!token) {
-        throw new Error('Missing auth token from Clerk')
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}trainingprograms`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      )
-
-      if (!response.ok) {
-        const message = await response.text()
-        throw new Error(
-          message ||
-            `Failed to load training programs (status ${response.status})`,
-        )
-      }
-
-      return (await response.json()) as TrainingProgram[]
+      const result = await api<TrainingProgram[]>('trainingprograms')
+      return result ?? []
     },
   })
 
   useEffect(() => {
-    if (isError && error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Failed to load training programs'
-      toast.error(message)
-    }
+    if (isError && error) toast.error(error.message)
   }, [isError, error])
 
+  // CREATE mutation
   const createProgramMutation = useMutation<
     TrainingProgram,
     Error,
     CreateTrainingProgramInput
   >({
     mutationFn: async (input) => {
-      const token = await getToken()
-      if (!token) {
-        throw new Error('Missing auth token from Clerk')
-      }
+      const requestPromise = api<TrainingProgram>('trainingprograms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
 
-      const requestPromise = (async () => {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
-          },
-        )
-
-        if (!response.ok) {
-          const message = await response.text()
-          throw new Error(
-            message || `Create failed with status ${response.status}`,
-          )
-        }
-
-        return (await response.json()) as TrainingProgram
-      })()
-
-      return await toast.promise(requestPromise, {
+      const result = await toast.promise(requestPromise, {
         pending: 'Creating program...',
-        success: 'Program created successfully',
+        success: 'Program created',
         error: {
           render({ data }) {
             const e = data as Error | undefined
@@ -129,56 +69,32 @@ export function TrainingProgramsPage() {
           },
         },
       })
+
+      if (!result) throw new Error('Failed to create program')
+      return result
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: TRAINING_PROGRAMS_QUERY_KEY,
-      })
-
-      setName('')
-      setDescription('')
-      setLevel('beginner')
-      setShowForm(false)
+      await queryClient.invalidateQueries({ queryKey: programsKeys.list() })
+      setIsCreateOpen(false)
     },
   })
 
+  // UPDATE mutation
   const updateProgramMutation = useMutation<
     TrainingProgram,
     Error,
-    { programId: string; input: UpdateTrainingProgramInput }
+    { id: string; input: CreateTrainingProgramInput }
   >({
-    mutationFn: async ({ programId, input }) => {
-      const token = await getToken()
-      if (!token) {
-        throw new Error('Missing auth token from Clerk')
-      }
+    mutationFn: async ({ id, input }) => {
+      const requestPromise = api<TrainingProgram>(`trainingprograms/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
 
-      const requestPromise = (async () => {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
-          },
-        )
-
-        if (!response.ok) {
-          const message = await response.text()
-          throw new Error(
-            message || `Update failed with status ${response.status}`,
-          )
-        }
-
-        return (await response.json()) as TrainingProgram
-      })()
-
-      return await toast.promise(requestPromise, {
+      const result = await toast.promise(requestPromise, {
         pending: 'Updating program...',
-        success: 'Program updated successfully',
+        success: 'Program updated',
         error: {
           render({ data }) {
             const e = data as Error | undefined
@@ -186,407 +102,202 @@ export function TrainingProgramsPage() {
           },
         },
       })
-    },
-    onSuccess: async (_, { programId }) => {
-      await queryClient.invalidateQueries({
-        queryKey: TRAINING_PROGRAMS_QUERY_KEY,
-      })
-      await queryClient.invalidateQueries({
-        queryKey: ['trainingprogram', programId],
-      })
 
+      if (!result) throw new Error('Failed to update program')
+      return result
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: programsKeys.list() })
       setIsEditOpen(false)
       setEditingProgram(null)
-      setEditName('')
-      setEditDescription('')
-      setEditLevel('beginner')
     },
   })
 
+  // DELETE mutation
   const deleteProgramMutation = useMutation<void, Error, string>({
     mutationFn: async (programId) => {
-      const token = await getToken()
-      if (!token) {
-        throw new Error('Missing auth token from Clerk')
-      }
-
-      const requestPromise = (async () => {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        if (!response.ok) {
-          const message = await response.text()
-          throw new Error(
-            message || `Delete failed with status ${response.status}`,
-          )
-        }
-
-        // 204 No Content - don't call response.json()
-      })()
-
-      return await toast.promise(requestPromise, {
-        pending: 'Deleting program...',
-        success: 'Program deleted successfully',
-        error: {
-          render({ data }) {
-            const e = data as Error | undefined
-            return e?.message ?? 'Failed to delete program'
-          },
-        },
-      })
+      await api(`trainingprograms/${programId}`, { method: 'DELETE' })
     },
-    onSuccess: async (_, deletedProgramId) => {
-      await queryClient.invalidateQueries({
-        queryKey: TRAINING_PROGRAMS_QUERY_KEY,
-      })
-
-      // Clean up last used program if it was deleted
-      if (lastUsedProgramId === deletedProgramId) {
-        localStorage.removeItem(LAST_USED_PROGRAM_KEY)
-        setLastUsedProgramId(null)
-      }
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: programsKeys.list() })
     },
   })
 
-  const handleCreate = (e: FormEvent) => {
-    e.preventDefault()
+  // DELETE with optimistic undo - hook called at top level
+  const executeDeleteProgram = useUndoableDelete<
+    TrainingProgram[],
+    TrainingProgram
+  >({
+    queryKey: programsKeys.list(),
+    deleteFn: (program) => deleteProgramMutation.mutateAsync(program.id),
+    optimisticUpdate: (old, program) =>
+      old?.filter((p) => p.id !== program.id) ?? [],
+    getItemLabel: (program) => program.name,
+  })
 
-    if (!name.trim()) {
-      toast.warn('Name is required')
+  // Handlers
+  const handleCreateProgram = (values: CreateTrainingProgramInput) => {
+    if (!values.name.trim()) {
+      toast.warn('Program name is required')
       return
     }
 
-    createProgramMutation.mutate({
-      name: name.trim(),
-      description: description.trim() || undefined,
-      level,
-    })
+    createProgramMutation.mutate(values)
   }
 
-  const handleEdit = (e: FormEvent) => {
-    e.preventDefault()
-
+  const handleEditProgram = (values: CreateTrainingProgramInput) => {
     if (!editingProgram) return
 
-    if (!editName.trim()) {
-      toast.warn('Name is required')
+    if (!values.name.trim()) {
+      toast.warn('Program name is required')
       return
     }
 
     updateProgramMutation.mutate({
-      programId: editingProgram.id,
-      input: {
-        name: editName.trim(),
-        description: editDescription.trim() || undefined,
-        level: editLevel,
-      },
+      id: editingProgram.id,
+      input: values,
     })
   }
 
-  const handleDelete = (program: TrainingProgram) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${program.name}"? This will also delete all workouts in this program.`,
-      )
-    ) {
-      deleteProgramMutation.mutate(program.id)
-    }
+  const handleDeleteProgram = (program: TrainingProgram) => {
+    executeDeleteProgram(program)
   }
 
   const openEditModal = (program: TrainingProgram) => {
     setEditingProgram(program)
-    setEditName(program.name)
-    setEditDescription(program.description || '')
-    setEditLevel(
-      (program.level || 'beginner') as 'beginner' | 'intermediate' | 'advanced',
-    )
     setIsEditOpen(true)
   }
 
-  // Track when a program is clicked
-  const handleProgramClick = (programId: string) => {
-    localStorage.setItem(LAST_USED_PROGRAM_KEY, programId)
-    setLastUsedProgramId(programId)
-  }
-
-  // Find the last used program
-  const lastProgram = lastUsedProgramId
-    ? programs.find((p) => p.id === lastUsedProgramId)
-    : null
-
   return (
-    <div className="mx-auto max-w-6xl p-4 space-y-6">
-      <h1 className="text-2xl font-semibold text-gray-900">
-        My Training Programs
-      </h1>
-
-      {/* Last Used Program */}
-      {!isPending && lastProgram && (
-        <Link
-          to="/programs/$programId"
-          params={{ programId: lastProgram.id }}
-          onClick={() => handleProgramClick(lastProgram.id)}
-          className="block"
-        >
-          <div className="rounded-xl border-2 border-indigo-600 bg-indigo-50 p-4 shadow-sm hover:shadow-md transition cursor-pointer">
-            <p className="text-xs font-semibold text-indigo-600 mb-2">
-              LAST USED
-            </p>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {lastProgram.name}
-            </h2>
-            {lastProgram.description && (
-              <p className="text-sm text-gray-700 mt-1">
-                {lastProgram.description}
-              </p>
-            )}
-            <div className="flex items-center justify-between mt-2">
-              {lastProgram.level && (
-                <span className="text-sm text-gray-600">
-                  {lastProgram.level}
-                </span>
-              )}
-              <p className="text-xs text-gray-500">
-                {new Date(lastProgram.createdAt).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-        </Link>
-      )}
-
-      {/* Button Controls */}
-      <div className="flex items-center justify-center gap-6">
+    <div className="mx-auto max-w-5xl p-4 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Training Programs
+        </h1>
         <button
-          onClick={() => setShowForm(!showForm)}
-          className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-lg font-medium text-white hover:bg-indigo-700 transition-colors"
+          onClick={() => setIsCreateOpen(true)}
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
-          {showForm ? '✕ Hide' : '+ New Program'}
-        </button>
-
-        <button
-          onClick={() => setShowPrograms(!showPrograms)}
-          className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-6 py-3 text-lg font-medium text-white hover:bg-blue-700 transition-colors"
-        >
-          {showPrograms ? '✕ Hide Programs' : 'View Programs'}
+          Create Program
         </button>
       </div>
 
-      {/* Create Program Form */}
-      {showForm && (
-        <form
-          onSubmit={handleCreate}
-          className="space-y-4 bg-white p-4 rounded-xl shadow-sm border max-w-xl mx-auto"
-        >
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Name</label>
-            <input
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My new training plan"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
-              Description
-            </label>
-            <textarea
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short description..."
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Level</label>
-            <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-indigo-500"
-              value={level}
-              onChange={(e) =>
-                setLevel(
-                  e.target.value as 'beginner' | 'intermediate' | 'advanced',
-                )
-              }
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-2 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition"
-            disabled={createProgramMutation.isPending}
-          >
-            {createProgramMutation.isPending ? 'Creating...' : 'Create Program'}
-          </button>
-        </form>
-      )}
-
       {/* Programs List */}
-      {showPrograms && (
-        <div className="space-y-4">
-          {isPending ? (
-            <p className="text-gray-600 text-center py-8">
-              Loading training programs...
-            </p>
-          ) : isError ? (
-            <p className="text-gray-600 text-center py-8">
-              Could not load programs. Please try again.
-            </p>
-          ) : !programs || programs.length === 0 ? (
-            <p className="text-gray-600 text-center py-8">
-              No training programs yet. Create one to get started.
-            </p>
-          ) : (
-            <ul className="space-y-3">
-              {programs.map((p) => (
-                <li
-                  key={p.id}
-                  className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <Link
-                      to="/programs/$programId"
-                      params={{ programId: p.id }}
-                      onClick={() => handleProgramClick(p.id)}
-                      className="flex-1 min-w-0"
-                    >
-                      <div className="flex items-center justify-between">
-                        <h2 className="font-semibold text-gray-900">
-                          {p.name}
-                        </h2>
-                        {p.level && (
-                          <span className="text-sm text-gray-500">
-                            {p.level}
-                          </span>
-                        )}
-                      </div>
-
-                      {p.description && (
-                        <p className="text-sm text-gray-700 mt-1">
-                          {p.description}
-                        </p>
-                      )}
-
-                      <p className="text-xs text-gray-400 mt-2">
-                        Created: {new Date(p.createdAt).toLocaleDateString()}
+      <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+        {isPending ? (
+          <p className="text-sm text-gray-600">Loading programs...</p>
+        ) : programs.length === 0 ? (
+          <p className="text-sm text-gray-600">
+            No training programs yet. Create your first one!
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {programs.map((program) => (
+              <li key={program.id} className="rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    to="/programs/$programId"
+                    params={{ programId: program.id }}
+                    className="flex-1 min-w-0 hover:bg-gray-50 transition-colors rounded-md p-2 -m-2 block"
+                  >
+                    <p className="font-semibold text-gray-900">
+                      {program.name}
+                    </p>
+                    {program.description && (
+                      <p className="text-sm text-gray-700 mt-1">
+                        {program.description}
                       </p>
-                    </Link>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">
+                      Level: {humanizeEnum(program.level)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Created:{' '}
+                      {new Date(program.createdAt).toLocaleDateString()}
+                    </p>
+                  </Link>
 
-                    <div className="flex flex-col gap-2 shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openEditModal(p)
-                        }}
-                        className="px-3 py-1 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 transition"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleDelete(p)
-                        }}
-                        className="px-3 py-1 text-sm rounded-md bg-red-600 text-white hover:bg-red-700 transition"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditModal(program)
+                      }}
+                      className="text-xs rounded-md bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setProgramToDelete(program)
+                      }}
+                      className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-      {/* Edit Modal */}
-      {isEditOpen && editingProgram && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Edit Program
-              </h3>
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50"
-                onClick={() => setIsEditOpen(false)}
-              >
-                Close
-              </button>
-            </div>
+      {/* Create Program Modal */}
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title="Create Training Program"
+      >
+        <ProgramForm
+          submitLabel="Create Program"
+          isSubmitting={createProgramMutation.isPending}
+          onSubmit={handleCreateProgram}
+          onCancel={() => setIsCreateOpen(false)}
+        />
+      </Modal>
 
-            <form onSubmit={handleEdit} className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                />
-              </div>
+      {/* Edit Program Modal */}
+      <Modal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        title="Edit Program"
+      >
+        <ProgramForm
+          defaultValues={
+            editingProgram
+              ? {
+                  name: editingProgram.name,
+                  description: editingProgram.description ?? undefined,
+                  level: (editingProgram.level ?? 'beginner') as
+                    | 'beginner'
+                    | 'intermediate'
+                    | 'advanced',
+                }
+              : undefined
+          }
+          submitLabel="Update Program"
+          isSubmitting={updateProgramMutation.isPending}
+          onSubmit={handleEditProgram}
+          onCancel={() => setIsEditOpen(false)}
+        />
+      </Modal>
 
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Description
-                </label>
-                <textarea
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-gray-700">
-                  Level
-                </label>
-                <select
-                  className="w-full rounded-md border border-gray-300 px-3 py-2"
-                  value={editLevel}
-                  onChange={(e) =>
-                    setEditLevel(
-                      e.target.value as
-                        | 'beginner'
-                        | 'intermediate'
-                        | 'advanced',
-                    )
-                  }
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-                disabled={updateProgramMutation.isPending}
-              >
-                {updateProgramMutation.isPending
-                  ? 'Updating...'
-                  : 'Update Program'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Confirm Delete Dialog */}
+      <ConfirmDialog
+        isOpen={!!programToDelete}
+        onClose={() => setProgramToDelete(null)}
+        onConfirm={() =>
+          programToDelete && handleDeleteProgram(programToDelete)
+        }
+        title="Delete Program"
+        description={`Are you sure you want to delete "${programToDelete?.name}"? This will also delete all workouts. This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+      />
     </div>
   )
 }
