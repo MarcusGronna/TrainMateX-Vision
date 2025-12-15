@@ -590,3 +590,7 @@ export function TrainingProgramsPage() {
     </div>
   )
 }
+
+// This page typically doesn't need a back-link since it's usually the main entry point
+// But if it does, use:
+// <BackLink to="/" label="Home" />
