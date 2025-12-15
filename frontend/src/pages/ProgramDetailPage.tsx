@@ -9,12 +9,14 @@ import { programsKeys } from '@/features/programs/keys'
 import { workoutsKeys } from '@/features/workouts/keys'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ProgramForm } from '@/features/programs/components/ProgramForm'
+import { WorkoutForm } from '@/features/workouts/components/WorkoutForm'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate, Link } from '@tanstack/react-router'
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'react-toastify'
-import type { Id } from 'react-toastify'
 
 export function ProgramDetailPage() {
   const { programId } = useParams({ from: '/programs/$programId' })
@@ -22,26 +24,11 @@ export function ProgramDetailPage() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
-  // Edit program modal state
+  // Modal states
   const [isEditProgramOpen, setIsEditProgramOpen] = useState(false)
-  const [editProgramName, setEditProgramName] = useState('')
-  const [editProgramDescription, setEditProgramDescription] = useState('')
-  const [editProgramLevel, setEditProgramLevel] = useState<
-    'beginner' | 'intermediate' | 'advanced'
-  >('beginner')
-
-  // Create workout state
   const [isCreateWorkoutOpen, setIsCreateWorkoutOpen] = useState(false)
-  const [workoutName, setWorkoutName] = useState('')
-  const [dayOfWeek, setDayOfWeek] = useState('')
-  const [notes, setNotes] = useState('')
-
-  // Edit workout modal state
   const [isEditWorkoutOpen, setIsEditWorkoutOpen] = useState(false)
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null)
-  const [editWorkoutName, setEditWorkoutName] = useState('')
-  const [editDayOfWeek, setEditDayOfWeek] = useState('')
-  const [editNotes, setEditNotes] = useState('')
 
   // Confirm delete states
   const [isDeleteProgramDialogOpen, setIsDeleteProgramDialogOpen] =
@@ -67,20 +54,6 @@ export function ProgramDetailPage() {
     if (isProgramError && programError) toast.error(programError.message)
   }, [isProgramError, programError])
 
-  // Sync edit form with program data
-  useEffect(() => {
-    if (program) {
-      setEditProgramName(program.name)
-      setEditProgramDescription(program.description || '')
-      setEditProgramLevel(
-        (program.level || 'beginner') as
-          | 'beginner'
-          | 'intermediate'
-          | 'advanced',
-      )
-    }
-  }, [program])
-
   // Fetch workouts for this program
   const {
     data: workouts = [],
@@ -102,51 +75,46 @@ export function ProgramDetailPage() {
   }, [isWorkoutsError, workoutsError])
 
   // CREATE workout mutation
-  const createWorkoutMutation = useMutation<
-    Workout,
-    Error,
-    { name: string; dayOfWeek?: string; notes?: string }
-  >({
-    mutationFn: async (input) => {
-      const requestPromise = api<Workout>(
-        `trainingprograms/${programId}/workouts`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        },
-      )
-
-      const result = await toast.promise(requestPromise, {
-        pending: 'Creating workout...',
-        success: 'Workout created',
-        error: {
-          render({ data }) {
-            const e = data as Error | undefined
-            return e?.message ?? 'Failed to create workout'
+  const createWorkoutMutation = useMutation<Workout, Error, CreateWorkoutInput>(
+    {
+      mutationFn: async (input) => {
+        const requestPromise = api<Workout>(
+          `trainingprograms/${programId}/workouts`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(input),
           },
-        },
-      })
+        )
 
-      if (!result) throw new Error('Failed to create workout')
-      return result
+        const result = await toast.promise(requestPromise, {
+          pending: 'Creating workout...',
+          success: 'Workout created',
+          error: {
+            render({ data }) {
+              const e = data as Error | undefined
+              return e?.message ?? 'Failed to create workout'
+            },
+          },
+        })
+
+        if (!result) throw new Error('Failed to create workout')
+        return result
+      },
+      onSuccess: async (newWorkout) => {
+        await queryClient.invalidateQueries({
+          queryKey: workoutsKeys.list(programId),
+        })
+
+        setIsCreateWorkoutOpen(false)
+
+        navigate({
+          to: '/programs/$programId/workouts/$workoutId',
+          params: { programId, workoutId: newWorkout.id },
+        })
+      },
     },
-    onSuccess: async (newWorkout) => {
-      await queryClient.invalidateQueries({
-        queryKey: workoutsKeys.list(programId),
-      })
-
-      setIsCreateWorkoutOpen(false)
-      setWorkoutName('')
-      setDayOfWeek('')
-      setNotes('')
-
-      navigate({
-        to: '/programs/$programId/workouts/$workoutId',
-        params: { programId, workoutId: newWorkout.id },
-      })
-    },
-  })
+  )
 
   // UPDATE program mutation
   const updateProgramMutation = useMutation<
@@ -190,7 +158,7 @@ export function ProgramDetailPage() {
     },
   })
 
-  // DELETE program mutation with optimistic update
+  // DELETE program mutation
   const deleteProgramMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
       const requestPromise = api(`trainingprograms/${programId}`, {
@@ -257,7 +225,7 @@ export function ProgramDetailPage() {
     },
   })
 
-  // DELETE workout mutation with optimistic update
+  // DELETE workout mutation
   const deleteWorkoutMutation = useMutation<void, Error, string>({
     mutationFn: async (workoutId) => {
       const requestPromise = api(
@@ -285,190 +253,62 @@ export function ProgramDetailPage() {
   })
 
   // Handlers
-  const handleCreateWorkout = (e: FormEvent) => {
-    e.preventDefault()
-
-    const trimmedName = workoutName.trim()
-    if (!trimmedName) {
+  const handleCreateWorkout = (values: CreateWorkoutInput) => {
+    if (!values.name.trim()) {
       toast.warn('Workout name is required')
       return
     }
 
-    createWorkoutMutation.mutate({
-      name: trimmedName,
-      dayOfWeek: dayOfWeek.trim() || undefined,
-      notes: notes.trim() || undefined,
-    })
+    createWorkoutMutation.mutate(values)
   }
 
-  const handleEditProgram = (e: FormEvent) => {
-    e.preventDefault()
-
-    const trimmedName = editProgramName.trim()
-    if (!trimmedName) {
+  const handleEditProgram = (values: UpdateTrainingProgramInput) => {
+    if (!values.name.trim()) {
       toast.warn('Program name is required')
       return
     }
 
-    updateProgramMutation.mutate({
-      name: trimmedName,
-      description: editProgramDescription.trim() || undefined,
-      level: editProgramLevel,
-    })
+    updateProgramMutation.mutate(values)
   }
 
   const handleDeleteProgram = () => {
-    // Store previous data for rollback
-    const previousPrograms = queryClient.getQueryData<TrainingProgram[]>(
-      programsKeys.list(),
-    )
+    const executeDelete = useUndoableDelete<TrainingProgram[]>({
+      queryKey: programsKeys.list(),
+      deleteFn: () => deleteProgramMutation.mutateAsync(),
+      optimisticUpdate: (old) => old?.filter((p) => p.id !== programId) ?? [],
+      itemLabel: program?.name || 'program',
+    })
 
-    // Optimistically remove from cache
-    queryClient.setQueryData<TrainingProgram[]>(
-      programsKeys.list(),
-      (old) => old?.filter((p) => p.id !== programId) ?? [],
-    )
-
-    let timeoutId: NodeJS.Timeout | null = null
-    let toastId: Id | null = null
-    let isUndone = false
-
-    // Show undo toast
-    toastId = toast.info(
-      <div className="flex items-center justify-between gap-4 text-sm">
-        <span className="text-gray-700">
-          Deleted <strong>{program?.name || 'program'}</strong>
-        </span>
-        <button
-          onClick={() => {
-            isUndone = true
-            if (timeoutId) clearTimeout(timeoutId)
-            if (toastId) toast.dismiss(toastId)
-
-            // Rollback optimistic update
-            queryClient.setQueryData(programsKeys.list(), previousPrograms)
-
-            toast.success('Undo successful')
-          }}
-          className="shrink-0 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors"
-        >
-          Undo
-        </button>
-      </div>,
-      {
-        autoClose: 5000,
-        closeButton: false,
-        onClose: () => {
-          if (timeoutId) clearTimeout(timeoutId)
-        },
-      },
-    )
-
-    // Execute actual deletion after delay
-    timeoutId = setTimeout(() => {
-      if (!isUndone) {
-        deleteProgramMutation.mutate(undefined, {
-          onError: () => {
-            // Rollback on error
-            queryClient.setQueryData(programsKeys.list(), previousPrograms)
-          },
-        })
-      }
-    }, 5000)
+    executeDelete()
   }
 
-  const handleEditWorkout = (e: FormEvent) => {
-    e.preventDefault()
-
+  const handleEditWorkout = (values: CreateWorkoutInput) => {
     if (!editingWorkout) return
 
-    const trimmedName = editWorkoutName.trim()
-    if (!trimmedName) {
+    if (!values.name.trim()) {
       toast.warn('Workout name is required')
       return
     }
 
     updateWorkoutMutation.mutate({
       workoutId: editingWorkout.id,
-      input: {
-        name: trimmedName,
-        dayOfWeek: editDayOfWeek.trim() || undefined,
-        notes: editNotes.trim() || undefined,
-      },
+      input: values,
     })
   }
 
   const handleDeleteWorkout = (workout: Workout) => {
-    // Store previous data for rollback
-    const previousWorkouts = queryClient.getQueryData<Workout[]>(
-      workoutsKeys.list(programId),
-    )
+    const executeDelete = useUndoableDelete<Workout[]>({
+      queryKey: workoutsKeys.list(programId),
+      deleteFn: () => deleteWorkoutMutation.mutateAsync(workout.id),
+      optimisticUpdate: (old) => old?.filter((w) => w.id !== workout.id) ?? [],
+      itemLabel: workout.name,
+    })
 
-    // Optimistically remove from cache
-    queryClient.setQueryData<Workout[]>(
-      workoutsKeys.list(programId),
-      (old) => old?.filter((w) => w.id !== workout.id) ?? [],
-    )
-
-    let timeoutId: NodeJS.Timeout | null = null
-    let toastId: Id | null = null
-    let isUndone = false
-
-    // Show undo toast
-    toastId = toast.info(
-      <div className="flex items-center justify-between gap-4 text-sm">
-        <span className="text-gray-700">
-          Deleted <strong>{workout.name}</strong>
-        </span>
-        <button
-          onClick={() => {
-            isUndone = true
-            if (timeoutId) clearTimeout(timeoutId)
-            if (toastId) toast.dismiss(toastId)
-
-            // Rollback optimistic update
-            queryClient.setQueryData(
-              workoutsKeys.list(programId),
-              previousWorkouts,
-            )
-
-            toast.success('Undo successful')
-          }}
-          className="shrink-0 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors"
-        >
-          Undo
-        </button>
-      </div>,
-      {
-        autoClose: 5000,
-        closeButton: false,
-        onClose: () => {
-          if (timeoutId) clearTimeout(timeoutId)
-        },
-      },
-    )
-
-    // Execute actual deletion after delay
-    timeoutId = setTimeout(() => {
-      if (!isUndone) {
-        deleteWorkoutMutation.mutate(workout.id, {
-          onError: () => {
-            // Rollback on error
-            queryClient.setQueryData(
-              workoutsKeys.list(programId),
-              previousWorkouts,
-            )
-          },
-        })
-      }
-    }, 5000)
+    executeDelete()
   }
 
   const openEditWorkoutModal = (workout: Workout) => {
     setEditingWorkout(workout)
-    setEditWorkoutName(workout.name)
-    setEditDayOfWeek(workout.dayOfWeek || '')
-    setEditNotes(workout.notes || '')
     setIsEditWorkoutOpen(true)
   }
 
@@ -591,56 +431,12 @@ export function ProgramDetailPage() {
         onClose={() => setIsCreateWorkoutOpen(false)}
         title="Add Workout"
       >
-        <form onSubmit={handleCreateWorkout} className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Name *</label>
-            <input
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={workoutName}
-              onChange={(e) => setWorkoutName(e.target.value)}
-              placeholder="e.g., Upper Body Day"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
-              Day of Week
-            </label>
-            <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={dayOfWeek}
-              onChange={(e) => setDayOfWeek(e.target.value)}
-            >
-              <option value="">Select a day...</option>
-              <option value="Monday">Monday</option>
-              <option value="Tuesday">Tuesday</option>
-              <option value="Wednesday">Wednesday</option>
-              <option value="Thursday">Thursday</option>
-              <option value="Friday">Friday</option>
-              <option value="Saturday">Saturday</option>
-              <option value="Sunday">Sunday</option>
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Notes</label>
-            <textarea
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes"
-              rows={3}
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-            disabled={createWorkoutMutation.isPending}
-          >
-            {createWorkoutMutation.isPending ? 'Creating...' : 'Create Workout'}
-          </button>
-        </form>
+        <WorkoutForm
+          submitLabel="Create Workout"
+          isSubmitting={createWorkoutMutation.isPending}
+          onSubmit={handleCreateWorkout}
+          onCancel={() => setIsCreateWorkoutOpen(false)}
+        />
       </Modal>
 
       {/* Edit Program Modal */}
@@ -649,54 +445,26 @@ export function ProgramDetailPage() {
         onClose={() => setIsEditProgramOpen(false)}
         title="Edit Program"
       >
-        <form onSubmit={handleEditProgram} className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Name</label>
-            <input
-              type="text"
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={editProgramName}
-              onChange={(e) => setEditProgramName(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
-              Description
-            </label>
-            <textarea
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={editProgramDescription}
-              onChange={(e) => setEditProgramDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Level</label>
-            <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={editProgramLevel}
-              onChange={(e) =>
-                setEditProgramLevel(
-                  e.target.value as 'beginner' | 'intermediate' | 'advanced',
-                )
-              }
-            >
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-            disabled={updateProgramMutation.isPending}
-          >
-            {updateProgramMutation.isPending ? 'Updating...' : 'Update Program'}
-          </button>
-        </form>
+        <ProgramForm
+          defaultValues={
+            program
+              ? {
+                  name: program.name,
+                  description: program.description ?? undefined,
+                  level:
+                    (program.level as
+                      | 'beginner'
+                      | 'intermediate'
+                      | 'advanced'
+                      | undefined) ?? undefined,
+                }
+              : undefined
+          }
+          submitLabel="Update Program"
+          isSubmitting={updateProgramMutation.isPending}
+          onSubmit={handleEditProgram}
+          onCancel={() => setIsEditProgramOpen(false)}
+        />
       </Modal>
 
       {/* Edit Workout Modal */}
@@ -705,55 +473,21 @@ export function ProgramDetailPage() {
         onClose={() => setIsEditWorkoutOpen(false)}
         title="Edit Workout"
       >
-        <form onSubmit={handleEditWorkout} className="space-y-3">
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Name</label>
-            <input
-              type="text"
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={editWorkoutName}
-              onChange={(e) => setEditWorkoutName(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">
-              Day of week
-            </label>
-            <select
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={editDayOfWeek}
-              onChange={(e) => setEditDayOfWeek(e.target.value)}
-            >
-              <option value="">Select a day...</option>
-              <option value="Monday">Monday</option>
-              <option value="Tuesday">Tuesday</option>
-              <option value="Wednesday">Wednesday</option>
-              <option value="Thursday">Thursday</option>
-              <option value="Friday">Friday</option>
-              <option value="Saturday">Saturday</option>
-              <option value="Sunday">Sunday</option>
-            </select>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-gray-700">Notes</label>
-            <textarea
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-              value={editNotes}
-              onChange={(e) => setEditNotes(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full rounded-md bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700"
-            disabled={updateWorkoutMutation.isPending}
-          >
-            {updateWorkoutMutation.isPending ? 'Updating...' : 'Update Workout'}
-          </button>
-        </form>
+        <WorkoutForm
+          defaultValues={
+            editingWorkout
+              ? {
+                  name: editingWorkout.name,
+                  dayOfWeek: editingWorkout.dayOfWeek ?? undefined,
+                  notes: editingWorkout.notes ?? undefined,
+                }
+              : undefined
+          }
+          submitLabel="Update Workout"
+          isSubmitting={updateWorkoutMutation.isPending}
+          onSubmit={handleEditWorkout}
+          onCancel={() => setIsEditWorkoutOpen(false)}
+        />
       </Modal>
 
       {/* Confirm Delete Program Dialog */}
