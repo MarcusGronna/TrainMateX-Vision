@@ -1,6 +1,7 @@
 import type { Exercise } from '@/types/Exercise'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
+import { BackLink } from '@/components/BackLink'
 
 import { useAuth } from '@clerk/clerk-react'
 import { useQuery } from '@tanstack/react-query'
@@ -64,8 +65,15 @@ export function ExerciseLibraryPage() {
   }, [exercises, search])
 
   return (
-    <div className="mx-auto max-w-3xl p-4 space-y-4">
-      <h1 className="text-2xl font-semibold text-gray-900">Exercise library</h1>
+    <div className="mx-auto max-w-5xl p-4 space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Exercise Library
+          </h1>
+          <BackLink to=".." />
+        </div>
+      </div>
 
       <div className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
         <ExerciseFilters
