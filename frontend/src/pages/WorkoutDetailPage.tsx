@@ -8,9 +8,9 @@ import type { Workout, UpdateWorkoutInput } from '@/types/Workout'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { ExerciseFilters } from '@/components/ExerciseFilters'
 import { BackLink } from '@/components/BackLink'
+import { useApi } from '@/lib/api/useApi'
 
-import { useAuth } from '@clerk/clerk-react'
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import { useNavigate, useParams } from '@tanstack/react-router'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { toast } from 'react-toastify'
 import type { Id } from 'react-toastify'
@@ -26,7 +26,7 @@ export function WorkoutDetailPage() {
     from: '/programs/$programId/workouts/$workoutId',
   })
 
-  const { getToken } = useAuth()
+  const { api } = useApi()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -51,22 +51,7 @@ export function WorkoutDetailPage() {
     error: workoutsError,
   } = useQuery<Workout[], Error>({
     queryKey: WORKOUTS_QUERY_KEY(programId),
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Failed to load workouts (status ${res.status})`)
-      }
-
-      return (await res.json()) as Workout[]
-    },
+    queryFn: () => api<Workout[]>(`trainingprograms/${programId}/workouts`),
   })
 
   useEffect(() => {
@@ -86,24 +71,7 @@ export function WorkoutDetailPage() {
     error: workoutExercisesError,
   } = useQuery<WorkoutExercise[], Error>({
     queryKey: WORKOUT_EXERCISES_QUERY_KEY(workoutId),
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}workouts/${workoutId}/exercises`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      )
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(
-          msg || `Failed to load workout exercises (status ${res.status})`,
-        )
-      }
-
-      return (await res.json()) as WorkoutExercise[]
-    },
+    queryFn: () => api<WorkoutExercise[]>(`workouts/${workoutId}/exercises`),
   })
 
   useEffect(() => {
@@ -123,6 +91,7 @@ export function WorkoutDetailPage() {
     [muscleGroup, equipment, difficulty],
   )
 
+  // Fetch exercises for library
   const {
     data: exercises = [],
     isPending: isExercisesLoading,
@@ -130,30 +99,14 @@ export function WorkoutDetailPage() {
     error: exercisesError,
   } = useQuery<Exercise[], Error>({
     queryKey: exerciseQueryKey,
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
+    queryFn: () => {
       const params = new URLSearchParams()
       if (muscleGroup) params.set('MuscleGroup', muscleGroup)
       if (equipment) params.set('Equipment', equipment)
       if (difficulty) params.set('Difficulty', difficulty)
 
       const qs = params.toString()
-      const url = `${import.meta.env.VITE_API_BASE_URL}exercises${qs ? `?${qs}` : ''}`
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(
-          msg || `Failed to load exercises (status ${res.status})`,
-        )
-      }
-
-      return (await res.json()) as Exercise[]
+      return api<Exercise[]>(`exercises${qs ? `?${qs}` : ''}`)
     },
   })
 
@@ -178,35 +131,21 @@ export function WorkoutDetailPage() {
   const [weight, setWeight] = useState<number | ''>('')
   const [notes, setNotes] = useState('')
 
+  // CREATE workout exercise mutation
   const createWorkoutExerciseMutation = useMutation<
     WorkoutExercise,
     Error,
     CreateWorkoutExerciseInput
   >({
     mutationFn: async (input) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}workouts/${workoutId}/exercises`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
-          },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Create failed with status ${res.status}`)
-        }
-
-        return (await res.json()) as WorkoutExercise
-      })()
+      const requestPromise = api<WorkoutExercise>(
+        `workouts/${workoutId}/exercises`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      )
 
       return await toast.promise(requestPromise, {
         pending: 'Adding exercise...',
@@ -280,29 +219,17 @@ export function WorkoutDetailPage() {
     setEditWorkoutNotes(workout.notes ?? '')
   }, [workout])
 
+  // UPDATE workout mutation
   const updateWorkoutMutation = useMutation<void, Error, UpdateWorkoutInput>({
     mutationFn: async (input) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts/${workoutId}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
-          },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Update workout failed (status ${res.status})`)
-        }
-      })()
+      const requestPromise = api(
+        `trainingprograms/${programId}/workouts/${workoutId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        },
+      )
 
       await toast.promise(requestPromise, {
         pending: 'Saving workout...',
@@ -322,22 +249,13 @@ export function WorkoutDetailPage() {
     },
   })
 
+  // DELETE workout mutation
   const deleteWorkoutMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}trainingprograms/${programId}/workouts/${workoutId}`,
-          { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(msg || `Delete workout failed (status ${res.status})`)
-        }
-      })()
+      const requestPromise = api(
+        `trainingprograms/${programId}/workouts/${workoutId}`,
+        { method: 'DELETE' },
+      )
 
       await toast.promise(requestPromise, {
         pending: 'Deleting workout...',
@@ -460,35 +378,18 @@ export function WorkoutDetailPage() {
     setIsEditWEOpen(true)
   }
 
+  // UPDATE workout exercise mutation
   const updateWorkoutExerciseMutation = useMutation<
     void,
     Error,
     { id: string; input: UpdateWorkoutExerciseInput }
   >({
     mutationFn: async ({ id, input }) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const requestPromise = (async () => {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}workouts/${workoutId}/exercises/${id}`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(input),
-          },
-        )
-
-        if (!res.ok) {
-          const msg = await res.text()
-          throw new Error(
-            msg || `Update exercise failed (status ${res.status})`,
-          )
-        }
-      })()
+      const requestPromise = api(`workouts/${workoutId}/exercises/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
 
       await toast.promise(requestPromise, {
         pending: 'Saving exercise...',
@@ -509,20 +410,23 @@ export function WorkoutDetailPage() {
     },
   })
 
+  // DELETE workout exercise mutation
   const deleteWorkoutExerciseMutation = useMutation<void, Error, string>({
     mutationFn: async (workoutExerciseId) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing auth token')
-
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}workouts/${workoutId}/exercises/${workoutExerciseId}`,
-        { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } },
+      const requestPromise = api(
+        `workouts/${workoutId}/exercises/${workoutExerciseId}`,
+        { method: 'DELETE' },
       )
 
-      if (!res.ok) {
-        const msg = await res.text()
-        throw new Error(msg || `Remove exercise failed (status ${res.status})`)
-      }
+      await toast.promise(requestPromise, {
+        pending: 'Removing exercise...',
+        success: 'Exercise removed',
+        error: {
+          render({ data }) {
+            return (data as Error)?.message ?? 'Remove failed'
+          },
+        },
+      })
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
@@ -694,7 +598,7 @@ export function WorkoutDetailPage() {
             Workout:{' '}
             {workout?.name ?? (isWorkoutsLoading ? 'Loading...' : 'Unknown')}
           </h1>
-          <BackLink to="/programs/$programId" params={{ programId }} />
+          <BackLink to="/programs/$programId" label="Back to Workouts" />
         </div>
 
         {workout && (
