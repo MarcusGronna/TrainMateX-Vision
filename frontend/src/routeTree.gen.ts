@@ -26,9 +26,9 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgramsProgramIdRoute = ProgramsProgramIdRouteImport.update({
-  id: '/programs/$programId',
-  path: '/programs/$programId',
-  getParentRoute: () => rootRouteImport,
+  id: '/$programId',
+  path: '/$programId',
+  getParentRoute: () => ProgramsRoute,
 } as any)
 const ProgramsProgramIdIndexRoute = ProgramsProgramIdIndexRouteImport.update({
   id: '/',
@@ -89,7 +89,6 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ExercisesRoute: typeof ExercisesRoute
-  ProgramsProgramIdRoute: typeof ProgramsProgramIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -110,10 +109,10 @@ declare module '@tanstack/react-router' {
     }
     '/programs/$programId': {
       id: '/programs/$programId'
-      path: '/programs/$programId'
+      path: '/$programId'
       fullPath: '/programs/$programId'
       preLoaderRoute: typeof ProgramsProgramIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ProgramsRoute
     }
     '/programs/$programId/': {
       id: '/programs/$programId/'
@@ -132,24 +131,9 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface ProgramsProgramIdRouteChildren {
-  ProgramsProgramIdIndexRoute: typeof ProgramsProgramIdIndexRoute
-  ProgramsProgramIdWorkoutsWorkoutIdRoute: typeof ProgramsProgramIdWorkoutsWorkoutIdRoute
-}
-
-const ProgramsProgramIdRouteChildren: ProgramsProgramIdRouteChildren = {
-  ProgramsProgramIdIndexRoute: ProgramsProgramIdIndexRoute,
-  ProgramsProgramIdWorkoutsWorkoutIdRoute:
-    ProgramsProgramIdWorkoutsWorkoutIdRoute,
-}
-
-const ProgramsProgramIdRouteWithChildren =
-  ProgramsProgramIdRoute._addFileChildren(ProgramsProgramIdRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ExercisesRoute: ExercisesRoute,
-  ProgramsProgramIdRoute: ProgramsProgramIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
