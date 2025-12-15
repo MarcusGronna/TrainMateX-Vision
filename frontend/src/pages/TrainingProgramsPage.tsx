@@ -1,4 +1,5 @@
 import type { TrainingProgram } from '@/types/TrainingProgram'
+import type { CreateTrainingProgramInput } from '@/types/CreateTrainingProgramInput'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { useApi } from '@/lib/api/useApi'
 import { programsKeys } from '@/features/programs/keys'
@@ -6,6 +7,13 @@ import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ProgramForm } from '@/features/programs/components/ProgramForm'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardTitle,
+} from '@/components/ui/Card'
+import { SectionTitle } from '@/components/ui/SectionTitle'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
@@ -40,7 +48,11 @@ export function TrainingProgramsPage() {
   }, [isError, error])
 
   // Create training program mutation
-  const createProgramMutation = useMutation<TrainingProgram, Error>({
+  const createProgramMutation = useMutation<
+    TrainingProgram,
+    Error,
+    CreateTrainingProgramInput
+  >({
     mutationFn: async (input) => {
       const requestPromise = api<TrainingProgram>('trainingprograms', {
         method: 'POST',
@@ -101,11 +113,17 @@ export function TrainingProgramsPage() {
     },
   })
 
-  const handleCreateProgram = (values: any) => {
+  const handleCreateProgram = (values: CreateTrainingProgramInput) => {
     if (!values.name.trim()) {
       toast.warn('Program name is required')
       return
     }
+
+    createProgramMutation.mutate({
+      name: values.name,
+      description: values.description || undefined,
+      level: values.level,
+    })
   }
 
   const handleDeleteProgram = (program: TrainingProgram) => {
@@ -121,39 +139,32 @@ export function TrainingProgramsPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-gray-900">
-            Training Programs
-          </h1>
-          <p className="text-sm text-gray-600">
-            Manage your workout programs and routines
-          </p>
-        </div>
-
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          Create Program
-        </button>
-      </div>
+      <SectionTitle
+        description="Manage your workout programs and routines"
+        action={
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Create Program
+          </button>
+        }
+      >
+        Training Programs
+      </SectionTitle>
 
       {isPending ? (
         <p className="text-sm text-gray-600">Loading programs...</p>
       ) : programs.length === 0 ? (
-        <div className="rounded-xl border bg-white p-8 text-center">
-          <p className="text-gray-600">
+        <Card>
+          <p className="text-center text-gray-600">
             No training programs yet. Create your first one!
           </p>
-        </div>
+        </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {programs.map((program) => (
-            <div
-              key={program.id}
-              className="rounded-xl border bg-white p-4 hover:border-indigo-600 hover:shadow-md transition-all"
-            >
+            <Card key={program.id} clickable>
               <button
                 onClick={() =>
                   navigate({
@@ -163,11 +174,11 @@ export function TrainingProgramsPage() {
                 }
                 className="w-full text-left"
               >
-                <h3 className="font-semibold text-gray-900">{program.name}</h3>
+                <CardTitle>{program.name}</CardTitle>
                 {program.description && (
-                  <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                  <CardDescription className="mt-1 line-clamp-2">
                     {program.description}
-                  </p>
+                  </CardDescription>
                 )}
                 <p className="text-xs text-gray-500 mt-2">
                   Level: {humanizeEnum(program.level)}
@@ -177,7 +188,7 @@ export function TrainingProgramsPage() {
                 </p>
               </button>
 
-              <div className="mt-3 flex gap-2">
+              <CardFooter>
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
@@ -199,8 +210,8 @@ export function TrainingProgramsPage() {
                 >
                   Delete
                 </button>
-              </div>
-            </div>
+              </CardFooter>
+            </Card>
           ))}
         </div>
       )}
