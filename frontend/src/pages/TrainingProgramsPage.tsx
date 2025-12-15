@@ -1,6 +1,5 @@
 import type { TrainingProgram } from '@/types/TrainingProgram'
 import type { CreateTrainingProgramInput } from '@/types/CreateTrainingProgramInput'
-import type { Workout } from '@/types/Workout'
 import { humanizeEnum } from '@/lib/humanizeEnum'
 import { useApi } from '@/lib/api/useApi'
 import { programsKeys } from '@/features/programs/keys'
@@ -8,29 +7,28 @@ import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ProgramForm } from '@/features/programs/components/ProgramForm'
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardTitle,
-} from '@/components/ui/Card'
-import { SectionTitle } from '@/components/ui/SectionTitle'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import { toast } from 'react-toastify'
 
 export function TrainingProgramsPage() {
   const { api } = useApi()
   const queryClient = useQueryClient()
-  const navigate = useNavigate()
 
+  // Modal states
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingProgram, setEditingProgram] = useState<TrainingProgram | null>(
+    null,
+  )
+
+  // Confirm delete state
   const [programToDelete, setProgramToDelete] =
     useState<TrainingProgram | null>(null)
 
-  // Fetch training programs
+  // Fetch programs
   const {
     data: programs = [],
     isPending,
@@ -48,7 +46,7 @@ export function TrainingProgramsPage() {
     if (isError && error) toast.error(error.message)
   }, [isError, error])
 
-  // Create training program mutation
+  // CREATE mutation
   const createProgramMutation = useMutation<
     TrainingProgram,
     Error,
@@ -63,7 +61,7 @@ export function TrainingProgramsPage() {
 
       const result = await toast.promise(requestPromise, {
         pending: 'Creating program...',
-        success: 'Program created successfully',
+        success: 'Program created',
         error: {
           render({ data }) {
             const e = data as Error | undefined
@@ -75,59 +73,57 @@ export function TrainingProgramsPage() {
       if (!result) throw new Error('Failed to create program')
       return result
     },
-    onSuccess: async (newProgram) => {
-      await queryClient.invalidateQueries({
-        queryKey: programsKeys.list(),
-      })
-
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: programsKeys.list() })
       setIsCreateOpen(false)
-      navigate({
-        to: '/programs/$programId',
-        params: { programId: newProgram.id },
-      })
     },
   })
 
-  // DELETE program mutation
-  const deleteProgramMutation = useMutation<void, Error, string>({
-    mutationFn: async (programId) => {
-      const requestPromise = api(`trainingprograms/${programId}`, {
-        method: 'DELETE',
+  // UPDATE mutation
+  const updateProgramMutation = useMutation<
+    TrainingProgram,
+    Error,
+    { id: string; input: CreateTrainingProgramInput }
+  >({
+    mutationFn: async ({ id, input }) => {
+      const requestPromise = api<TrainingProgram>(`trainingprograms/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
       })
 
-      await toast.promise(requestPromise, {
-        pending: 'Deleting program...',
-        success: 'Program deleted',
+      const result = await toast.promise(requestPromise, {
+        pending: 'Updating program...',
+        success: 'Program updated',
         error: {
           render({ data }) {
             const e = data as Error | undefined
-            return e?.message ?? 'Failed to delete program'
+            return e?.message ?? 'Failed to update program'
           },
         },
       })
+
+      if (!result) throw new Error('Failed to update program')
+      return result
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: programsKeys.list(),
-      })
-      setProgramToDelete(null)
+      await queryClient.invalidateQueries({ queryKey: programsKeys.list() })
+      setIsEditOpen(false)
+      setEditingProgram(null)
     },
   })
 
-  const handleCreateProgram = (values: CreateTrainingProgramInput) => {
-    if (!values.name.trim()) {
-      toast.warn('Program name is required')
-      return
-    }
+  // DELETE mutation
+  const deleteProgramMutation = useMutation<void, Error, string>({
+    mutationFn: async (programId) => {
+      await api(`trainingprograms/${programId}`, { method: 'DELETE' })
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: programsKeys.list() })
+    },
+  })
 
-    createProgramMutation.mutate({
-      name: values.name,
-      description: values.description || undefined,
-      level: values.level,
-    })
-  }
-
-  // DELETE program with optimistic undo - hook called at top level
+  // DELETE with optimistic undo - hook called at top level
   const executeDeleteProgram = useUndoableDelete<
     TrainingProgram[],
     TrainingProgram
@@ -139,104 +135,115 @@ export function TrainingProgramsPage() {
     getItemLabel: (program) => program.name,
   })
 
+  // Handlers
+  const handleCreateProgram = (values: CreateTrainingProgramInput) => {
+    if (!values.name.trim()) {
+      toast.warn('Program name is required')
+      return
+    }
+
+    createProgramMutation.mutate(values)
+  }
+
+  const handleEditProgram = (values: CreateTrainingProgramInput) => {
+    if (!editingProgram) return
+
+    if (!values.name.trim()) {
+      toast.warn('Program name is required')
+      return
+    }
+
+    updateProgramMutation.mutate({
+      id: editingProgram.id,
+      input: values,
+    })
+  }
+
   const handleDeleteProgram = (program: TrainingProgram) => {
     executeDeleteProgram(program)
   }
 
-  const {
-    data: workout,
-    isPending: isWorkoutLoading,
-    isError: isWorkoutError,
-    error: workoutError,
-  } = useQuery<Workout, Error>({
-    queryKey: workoutsKeys.byId(programId, workoutId),
-    queryFn: async () => {
-      const result = await api<Workout>(
-        `trainingprograms/${programId}/workouts/${workoutId}`,
-      )
-      if (!result) throw new Error('Workout not found')
-      return result
-    },
-  })
+  const openEditModal = (program: TrainingProgram) => {
+    setEditingProgram(program)
+    setIsEditOpen(true)
+  }
 
   return (
     <div className="mx-auto max-w-5xl p-4 space-y-6">
-      <SectionTitle
-        description="Manage your workout programs and routines"
-        action={
-          <button
-            onClick={() => setIsCreateOpen(true)}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            Create Program
-          </button>
-        }
-      >
-        Training Programs
-      </SectionTitle>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold text-gray-900">
+          Training Programs
+        </h1>
+        <button
+          onClick={() => setIsCreateOpen(true)}
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Create Program
+        </button>
+      </div>
 
-      {isPending ? (
-        <p className="text-sm text-gray-600">Loading programs...</p>
-      ) : programs.length === 0 ? (
-        <Card>
-          <p className="text-center text-gray-600">
+      {/* Programs List */}
+      <section className="rounded-xl border bg-white p-4 shadow-sm space-y-4">
+        {isPending ? (
+          <p className="text-sm text-gray-600">Loading programs...</p>
+        ) : programs.length === 0 ? (
+          <p className="text-sm text-gray-600">
             No training programs yet. Create your first one!
           </p>
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {programs.map((program) => (
-            <Card key={program.id} clickable>
-              <button
-                onClick={() =>
-                  navigate({
-                    to: '/programs/$programId',
-                    params: { programId: program.id },
-                  })
-                }
-                className="w-full text-left"
-              >
-                <CardTitle>{program.name}</CardTitle>
-                {program.description && (
-                  <CardDescription className="mt-1 line-clamp-2">
-                    {program.description}
-                  </CardDescription>
-                )}
-                <p className="text-xs text-gray-500 mt-2">
-                  Level: {humanizeEnum(program.level)}
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Created: {new Date(program.createdAt).toLocaleDateString()}
-                </p>
-              </button>
+        ) : (
+          <ul className="space-y-3">
+            {programs.map((program) => (
+              <li key={program.id} className="rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    to="/programs/$programId"
+                    params={{ programId: program.id }}
+                    className="flex-1 min-w-0 hover:bg-gray-50 transition-colors rounded-md p-2 -m-2"
+                  >
+                    <p className="font-semibold text-gray-900">
+                      {program.name}
+                    </p>
+                    {program.description && (
+                      <p className="text-sm text-gray-700 mt-1">
+                        {program.description}
+                      </p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-2">
+                      Level: {humanizeEnum(program.level)}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Created:{' '}
+                      {new Date(program.createdAt).toLocaleDateString()}
+                    </p>
+                  </Link>
 
-              <CardFooter>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    navigate({
-                      to: '/programs/$programId',
-                      params: { programId: program.id },
-                    })
-                  }}
-                  className="flex-1 text-xs rounded-md bg-blue-600 px-3 py-1.5 text-white hover:bg-blue-700"
-                >
-                  View
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setProgramToDelete(program)
-                  }}
-                  className="flex-1 text-xs rounded-md bg-red-600 px-3 py-1.5 text-white hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      )}
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEditModal(program)
+                      }}
+                      className="text-xs rounded-md bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setProgramToDelete(program)
+                      }}
+                      className="text-xs rounded-md bg-red-600 px-2 py-1 text-white hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       {/* Create Program Modal */}
       <Modal
@@ -249,6 +256,29 @@ export function TrainingProgramsPage() {
           isSubmitting={createProgramMutation.isPending}
           onSubmit={handleCreateProgram}
           onCancel={() => setIsCreateOpen(false)}
+        />
+      </Modal>
+
+      {/* Edit Program Modal */}
+      <Modal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        title="Edit Program"
+      >
+        <ProgramForm
+          defaultValues={
+            editingProgram
+              ? {
+                  name: editingProgram.name,
+                  description: editingProgram.description ?? undefined,
+                  level: editingProgram.level,
+                }
+              : undefined
+          }
+          submitLabel="Update Program"
+          isSubmitting={updateProgramMutation.isPending}
+          onSubmit={handleEditProgram}
+          onCancel={() => setIsEditOpen(false)}
         />
       </Modal>
 
