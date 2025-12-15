@@ -13,3 +13,9 @@ export type CreateWorkoutInput = {
   dayOfWeek?: string
   notes?: string
 }
+
+export type UpdateWorkoutInput = {
+  name: string
+  dayOfWeek?: string
+  notes?: string
+}
